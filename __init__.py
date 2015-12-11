@@ -30,6 +30,7 @@ from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
 
+from .state import OmemoState
 from .ui import OmemoButton
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
@@ -40,6 +41,7 @@ NS_NOTIFY = NS_DEVICE_LIST + '+notify'
 class OmemoPlugin(GajimPlugin):
 
     device_ids = {}
+    omemo_states = {}
 
     @log_calls('OmemoPlugin')
     def init(self):
@@ -49,6 +51,9 @@ class OmemoPlugin(GajimPlugin):
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
                                      (self.connect_ui, None)}
+        log.info(gajim.contacts.get_accounts())
+        for account in gajim.contacts.get_accounts():
+            self.omemo_states[account] = OmemoState(account)
 
     @log_calls('OmemoPlugin')
     def activate(self):
