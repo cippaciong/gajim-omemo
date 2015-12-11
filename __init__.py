@@ -20,12 +20,15 @@ from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
 
+from .iq import DeviceListAnnouncement
 from .state import OmemoState
 from .ui import OmemoButton
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
 NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
 NS_NOTIFY = NS_DEVICE_LIST + '+notify'
+
+iq_ids_to_callbacks = {}
 
 
 class OmemoPlugin(GajimPlugin):
@@ -35,7 +38,8 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def init(self):
         self.events_handlers = {
-            'message-received': (ged.CORE, self._pep_received)
+            'message-received': (ged.CORE, self._pep_received),
+            'raw-iq-received': (ged.PRECORE, self.handle_iq_received)
         }
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
@@ -81,22 +85,30 @@ class OmemoPlugin(GajimPlugin):
         if items and len(items.getChildren()) == 1:
 
             account = pep.conn.name
-            log.info(account + ' ⇒ Received OMEMO pep')
+            contact_jid = gajim.get_jid_without_resource(pep.fjid)
+
+            log.info(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
 
             devices = items.getChildren()[0].getTag('list').getChildren()
             devices_list = [dev.getAttr('id') for dev in devices]
 
             state = self.omemo_states[account]
 
-            contact_jid = gajim.get_jid_without_resource(pep.fjid)
-            my_jid = gajim.get_jid_without_resource(pep.jid)
+            my_jid = gajim.get_jid_from_account(account)
+            log.info('MY JID ' + my_jid)
+            log.info('THEIR JID ' + contact_jid)
 
             if contact_jid == my_jid:
+                log.info(state.name + ' ⇒ Received own device_list ' + str(
+                    devices_list))
                 state.add_own_devices(devices_list)
 
-                if not state.own_device_id_published():
+                if not state.own_device_id_published() or anydup(
+                        state.own_devices):
                     # Our own device_id is not in the list, it could be
                     # overwritten by some other client?
+                    # also remove duplicates
+                    devices_list = list(set(state.own_devices))
                     devices_list.append(state.own_device_id)
                     self.publish_own_devices_list(state, devices_list)
             else:
@@ -104,8 +116,14 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def publish_own_devices_list(self, state, devices_list):
-        log.info(state.name + ' ⇒ Publishing own device_list ' + str(
+        log.info(state.name + ' ⇒ Publishing own devices_list ' + str(
             devices_list))
+        iq = DeviceListAnnouncement(devices_list)
+        log.info(iq)
+        gajim.connections[state.name].connection.send(iq)
+        id_ = str(iq.getAttr('id'))
+        log.info(state.name + ' ⇒ IQ id: ' + str(id_))
+        iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
     @log_calls('OmemoPlugin')
     def connect_ui(self, chat_control):
@@ -118,16 +136,24 @@ class OmemoPlugin(GajimPlugin):
                                          send_button_pos - 2, 'expand', False)
 
     @log_calls('OmemoPlugin')
-    def device_ids_for(self, contact):
-        account = contact.account.name
-        if account not in self.device_ids:
-            log.debug('Account:' + str(account) + '¬∈ devices_ids')
-            return None
-        contact_jid = gajim.get_jid_without_resource(contact.get_full_jid())
-        if contact_jid not in self.device_ids[account]:
-            log.debug('Contact:' + contact_jid + '¬∈ devices_ids[' + account +
-                      ']')
-            return None
+    def handle_iq_received(self, event):
+        global iq_ids_to_callbacks
+        id_ = str(event.stanza.getAttr("id"))
+        account = event.conn.name
+        if id_ in iq_ids_to_callbacks:
+            log.info(account + ' ⇒ Got IQ with id ' + id_)
+            try:
+                iq_ids_to_callbacks[id_](event.stanza)
+            except:
+                raise
+            finally:
+                del iq_ids_to_callbacks[id_]
 
-        log.info(self.device_ids[account])
-        return self.device_ids[account][contact_jid]
+
+def anydup(thelist):
+    seen = set()
+    for x in thelist:
+        if x in seen:
+            return True
+        seen.add(x)
+    return False
