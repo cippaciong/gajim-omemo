@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Gajim.  If not, see <http://www.gnu.org/licenses/>.
 #
-
 '''
 Acronyms expander plugin.
 
@@ -28,10 +27,10 @@ Acronyms expander plugin.
 '''
 
 from common import caps_cache, gajim, ged
-
-import gtk
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
+
+from .ui import OmemoButton
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
 NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
@@ -66,9 +65,11 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def _compute_caps_hash(self):
         for a in gajim.connections:
-            gajim.caps_hash[a] = caps_cache.compute_caps_hash([
-                gajim.gajim_identity], gajim.gajim_common_features +
-                gajim.gajim_optional_features[a])
+            gajim.caps_hash[a] = caps_cache.compute_caps_hash(
+                [
+                    gajim.gajim_identity
+                ],
+                gajim.gajim_common_features + gajim.gajim_optional_features[a])
             # re-send presence with new hash
             connected = gajim.connections[a].connected
             if connected > 1 and gajim.SHOW_LIST[connected] != 'invisible':
@@ -124,22 +125,9 @@ class OmemoPlugin(GajimPlugin):
             return None
         contact_jid = gajim.get_jid_without_resource(contact.get_full_jid())
         if contact_jid not in self.device_ids[account]:
-            log.debug('Contact:' + contact_jid +
-                      '¬∈ devices_ids[' + account + ']')
+            log.debug('Contact:' + contact_jid + '¬∈ devices_ids[' + account +
+                      ']')
             return None
 
         log.info(self.device_ids[account])
         return self.device_ids[account][contact_jid]
-
-
-class OmemoButton(gtk.Button):
-
-    def __init__(self, plugin, contact):
-        super(OmemoButton, self).__init__(label='OMEMO')
-        self.plugin = plugin
-        self.contact = contact
-        self.connect('clicked', self.on_click)
-
-    def on_click(self, widget):
-        devices = self.plugin.device_ids_for(self.contact)
-        log.info(devices)
