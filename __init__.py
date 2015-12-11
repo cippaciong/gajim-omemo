@@ -40,7 +40,6 @@ NS_NOTIFY = NS_DEVICE_LIST + '+notify'
 
 class OmemoPlugin(GajimPlugin):
 
-    device_ids = {}
     omemo_states = {}
 
     @log_calls('OmemoPlugin')
@@ -51,7 +50,6 @@ class OmemoPlugin(GajimPlugin):
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
                                      (self.connect_ui, None)}
-        log.info(gajim.contacts.get_accounts())
         for account in gajim.contacts.get_accounts():
             self.omemo_states[account] = OmemoState(account)
 
@@ -91,25 +89,33 @@ class OmemoPlugin(GajimPlugin):
         items = pep.stanza.getTag('event').getTag('items', {'node':
                                                             NS_DEVICE_LIST})
         if items and len(items.getChildren()) == 1:
-            # should only have one item
-            list_tag = items.getChildren()[0].getTag('list')
-            self._save_device_ids(pep, list_tag)
-            return
+
+            account = pep.conn.name
+            log.info(account + ' ⇒ Received OMEMO pep')
+
+            devices = items.getChildren()[0].getTag('list').getChildren()
+            devices_list = [dev.getAttr('id') for dev in devices]
+
+            state = self.omemo_states[account]
+
+            contact_jid = gajim.get_jid_without_resource(pep.fjid)
+            my_jid = gajim.get_jid_without_resource(pep.jid)
+
+            if contact_jid == my_jid:
+                state.add_own_devices(devices_list)
+
+                if not state.own_device_id_published():
+                    # Our own device_id is not in the list, it could be
+                    # overwritten by some other client?
+                    devices_list.append(state.own_device_id)
+                    self.publish_own_devices_list(state, devices_list)
+            else:
+                state.add_devices(contact_jid, devices_list)
 
     @log_calls('OmemoPlugin')
-    def _save_device_ids(self, pep, list_tag):
-        account = pep.conn.name
-        device_list = list_tag.getChildren()
-
-        contact_jid = gajim.get_jid_without_resource(pep.fjid)
-
-        self.device_ids[account] = {}
-        self.device_ids[account][contact_jid] = []
-
-        for device in device_list:
-            device_id = device.getAttr('id')
-            log.info(contact_jid + ' → ' + device_id)
-            self.device_ids[account][contact_jid].append(device_id)
+    def publish_own_devices_list(self, state, devices_list):
+        log.info(state.name + ' ⇒ Publishing own device_list ' + str(
+            devices_list))
 
     @log_calls('OmemoPlugin')
     def connect_ui(self, chat_control):
