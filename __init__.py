@@ -81,6 +81,7 @@ class OmemoPlugin(GajimPlugin):
                 gajim.connections[a].change_status(gajim.SHOW_LIST[connected],
                                                    gajim.connections[a].status)
 
+    @log_calls('OmemoPlugin')
     def _pep_received(self, pep):
 
         event = pep.stanza.getTag('event')
@@ -89,27 +90,25 @@ class OmemoPlugin(GajimPlugin):
 
         items = pep.stanza.getTag('event').getTag('items', {'node':
                                                             NS_DEVICE_LIST})
-        if not items:
-            # not a pep ignore it
-            return
-
-        if len(items.getChildren()) != 1:
+        if items and len(items.getChildren()) == 1:
             # should only have one item
+            list_tag = items.getChildren()[0].getTag('list')
+            self._save_device_ids(pep, list_tag)
             return
 
+    @log_calls('OmemoPlugin')
+    def _save_device_ids(self, pep, list_tag):
         account = pep.conn.name
-        device_list = items.getChildren()[0].getTag('list').getChildren()
+        device_list = list_tag.getChildren()
 
         contact_jid = gajim.get_jid_without_resource(pep.fjid)
 
-        if account not in self.device_ids:
-            self.device_ids[account] = {}
-
-        if contact_jid not in self.device_ids[account]:
-            self.device_ids[account][contact_jid] = []
+        self.device_ids[account] = {}
+        self.device_ids[account][contact_jid] = []
 
         for device in device_list:
             device_id = device.getAttr('id')
+            log.info(contact_jid + ' → ' + device_id)
             self.device_ids[account][contact_jid].append(device_id)
 
     @log_calls('OmemoPlugin')
