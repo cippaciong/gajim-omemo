@@ -1,30 +1,20 @@
 # -*- coding: utf-8 -*-
-#    otrmodule.py
+# copyright 2015 bahtiar `kalkin-` gadimov <bahtiar@gadimov.de>
 #
-# Copyright 2015 Bahtiar `kalkin-` Gadimov <bahtiar@gadimov.de>
+# this file is part of gajim.
 #
-# This file is part of Gajim.
+# gajim is free software; you can redistribute it and/or modify
+# it under the terms of the gnu general public license as published
+# by the free software foundation; version 3 only.
 #
-# Gajim is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published
-# by the Free Software Foundation; version 3 only.
+# gajim is distributed in the hope that it will be useful,
+# but without any warranty; without even the implied warranty of
+# merchantability or fitness for a particular purpose.  see the
+# gnu general public license for more details.
 #
-# Gajim is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# you should have received a copy of the gnu general public license
+# along with gajim.  if not, see <http://www.gnu.org/licenses/>.
 #
-# You should have received a copy of the GNU General Public License
-# along with Gajim.  If not, see <http://www.gnu.org/licenses/>.
-#
-'''
-Acronyms expander plugin.
-
-:author: Mateusz Biliński <mateusz@bilinski.it>
-:since: 202015
-:copyright: Copyright 2015 Bahtiar `kalkin-` Gadimov <bahtiar@gadimov.de>
-:license: GPL
-'''
 
 from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
