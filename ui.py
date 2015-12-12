@@ -14,6 +14,17 @@ class PreKeyButton(gtk.Button):
         self.plugin.query_prekey(self.contact)
 
 
+class ClearDevicesButton(gtk.Button):
+    def __init__(self, plugin, contact):
+        super(ClearDevicesButton, self).__init__(label='Clear Devices')
+        self.plugin = plugin
+        self.contact = contact
+        self.connect('clicked', self.on_click)
+
+    def on_click(self, widget):
+        self.plugin.clear_device_list(self.contact)
+
+
 class PublishButton(gtk.Button):
     def __init__(self, plugin, contact):
         super(PublishButton, self).__init__(label='Publish Bundle')
@@ -29,6 +40,8 @@ def make_ui(plugin, chat_control):
     button = PreKeyButton(plugin, chat_control.contact)
     _add_widget(button, chat_control)
     button = PublishButton(plugin, chat_control.contact)
+    _add_widget(button, chat_control)
+    button = ClearDevicesButton(plugin, chat_control.contact)
     _add_widget(button, chat_control)
 
 

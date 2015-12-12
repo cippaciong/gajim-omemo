@@ -112,7 +112,7 @@ class OmemoPlugin(GajimPlugin):
                     # overwritten by some other client?
                     # also remove duplicates
                     devices_list = list(set(state.own_devices))
-                    devices_list.append(state.own_device_id)
+                    devices_list.append(str(state.own_device_id))
                     self.publish_own_devices_list(state, devices_list)
             else:
                 state.add_devices(contact_jid, devices_list)
@@ -166,6 +166,13 @@ class OmemoPlugin(GajimPlugin):
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
         iq_ids_to_callbacks[id_] = lambda event: log.info(event)
+
+    def clear_device_list(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        devices_list = []
+        devices_list.append(str(state.own_device_id))
+        self.publish_own_devices_list(state, devices_list)
 
 
 def random_prekey(event):
