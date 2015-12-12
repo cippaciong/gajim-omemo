@@ -22,7 +22,8 @@ from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
 
-from .iq import BundleInformationQuery, DeviceListAnnouncement
+from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
+                 DeviceListAnnouncement)
 from .state import OmemoState
 from .ui import make_ui
 
@@ -157,6 +158,14 @@ class OmemoPlugin(GajimPlugin):
             gajim.connections[state.name].connection.send(iq)
             iq_id = str(iq.getAttr('id'))
             iq_ids_to_callbacks[iq_id] = random_prekey
+
+    @log_calls('OmemoPlugin')
+    def publish_bundle(self, account):
+        state = self.omemo_states[account.name]
+        iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
+        gajim.connections[state.name].connection.send(iq)
+        id_ = str(iq.getAttr("id"))
+        iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
 
 def random_prekey(event):

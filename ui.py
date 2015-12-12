@@ -14,8 +14,21 @@ class PreKeyButton(gtk.Button):
         self.plugin.query_prekey(self.contact)
 
 
+class PublishButton(gtk.Button):
+    def __init__(self, plugin, contact):
+        super(PublishButton, self).__init__(label='Publish Bundle')
+        self.plugin = plugin
+        self.contact = contact
+        self.connect('clicked', self.on_click)
+
+    def on_click(self, widget):
+        self.plugin.publish_bundle(self.contact.account)
+
+
 def make_ui(plugin, chat_control):
     button = PreKeyButton(plugin, chat_control.contact)
+    _add_widget(button, chat_control)
+    button = PublishButton(plugin, chat_control.contact)
     _add_widget(button, chat_control)
 
 
