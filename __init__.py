@@ -16,13 +16,15 @@
 # along with gajim.  if not, see <http://www.gnu.org/licenses/>.
 #
 
+import random
+
 from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
 
 from .iq import BundleInformationQuery, DeviceListAnnouncement
 from .state import OmemoState
-from .ui import OmemoButton
+from .ui import make_ui
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
 NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
@@ -125,14 +127,8 @@ class OmemoPlugin(GajimPlugin):
         iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
     @log_calls('OmemoPlugin')
-    def connect_ui(self, chat_control):
-        actions_hbox = chat_control.xml.get_object('actions_hbox')
-        send_button = chat_control.xml.get_object('send_button')
-        send_button_pos = actions_hbox.child_get_property(send_button,
-                                                          'position')
-        button = OmemoButton(self, chat_control.contact)
-        actions_hbox.add_with_properties(button, 'position',
-                                         send_button_pos - 2, 'expand', False)
+    def connect_ui(plugin, chat_control):
+        make_ui(plugin, chat_control)
 
     @log_calls('OmemoPlugin')
     def handle_iq_received(self, event):
@@ -149,7 +145,7 @@ class OmemoPlugin(GajimPlugin):
                 del iq_ids_to_callbacks[id_]
 
     @log_calls('OmemoPlugin')
-    def query_bundle(self, contact):
+    def query_prekey(self, contact):
         account = contact.account.name
         state = self.omemo_states[account]
         device_ids = state.device_ids_for(contact)
@@ -160,7 +156,15 @@ class OmemoPlugin(GajimPlugin):
             iq = BundleInformationQuery(contact.jid, id_)
             gajim.connections[state.name].connection.send(iq)
             iq_id = str(iq.getAttr('id'))
-            iq_ids_to_callbacks[iq_id] = lambda event: log.info(str(event))
+            iq_ids_to_callbacks[iq_id] = random_prekey
+
+
+def random_prekey(event):
+    prekeys = event.getTag('pubsub').getTag('items').getTag('item').getTag(
+        'bundle').getTag('prekeys').getChildren()
+    result = random.SystemRandom().choice(prekeys)
+    log.info(event.name + ' ⇒ Random Prekey for  ' + str(event.getAttr('from'))
+             + ': ' + str(result.getData()))
 
 
 def anydup(thelist):
