@@ -16,6 +16,7 @@
 # along with gajim.  if not, see <http://www.gnu.org/licenses/>.
 #
 
+import logging
 import os
 import random
 
@@ -24,7 +25,7 @@ from axolotl.invalidversionexception import InvalidVersionException
 
 from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
-from plugins.helpers import log, log_calls
+from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage)
@@ -36,6 +37,8 @@ NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
 NS_NOTIFY = NS_DEVICE_LIST + '+notify'
 
 iq_ids_to_callbacks = {}
+
+log = logging.getLogger('gajim.plugin_system.omemo')
 
 
 class OmemoPlugin(GajimPlugin):
@@ -218,6 +221,7 @@ class OmemoPlugin(GajimPlugin):
         id_ = str(iq.getAttr("id"))
         iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
+    @log_calls('OmemoPlugin')
     def clear_device_list(self, contact):
         account = contact.account.name
         state = self.omemo_states[account]
@@ -226,6 +230,7 @@ class OmemoPlugin(GajimPlugin):
         self.publish_own_devices_list(state, devices_list)
 
 
+@log_calls('OmemoPlugin')
 def random_prekey(event):
     prekeys = event.getTag('pubsub').getTag('items').getTag('item').getTag(
         'bundle').getTag('prekeys').getChildren()
