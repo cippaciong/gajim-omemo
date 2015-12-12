@@ -119,11 +119,9 @@ class OmemoPlugin(GajimPlugin):
             state = self.omemo_states[account]
 
             my_jid = gajim.get_jid_from_account(account)
-            log.info('MY JID ' + my_jid)
-            log.info('THEIR JID ' + contact_jid)
 
             if contact_jid == my_jid:
-                log.info(state.name + ' ⇒ Received own device_list ' + str(
+                log.debug(state.name + ' ⇒ Received own device_list ' + str(
                     devices_list))
                 state.add_own_devices(devices_list)
 
@@ -142,12 +140,11 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def publish_own_devices_list(self, state, devices_list):
-        log.info(state.name + ' ⇒ Publishing own devices_list ' + str(
+        log.debug(state.name + ' ⇒ Publishing own devices_list ' + str(
             devices_list))
         iq = DeviceListAnnouncement(devices_list)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr('id'))
-        log.info(state.name + ' ⇒ IQ id: ' + str(id_))
         iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
     @log_calls('OmemoPlugin')
@@ -158,9 +155,7 @@ class OmemoPlugin(GajimPlugin):
     def handle_iq_received(self, event):
         global iq_ids_to_callbacks
         id_ = str(event.stanza.getAttr("id"))
-        account = event.conn.name
         if id_ in iq_ids_to_callbacks:
-            log.info(account + ' ⇒ Got IQ with id ' + id_)
             try:
                 iq_ids_to_callbacks[id_](event.stanza)
             except:
