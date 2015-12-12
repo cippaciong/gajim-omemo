@@ -174,7 +174,7 @@ class OmemoPlugin(GajimPlugin):
         account = contact.account.name
         state = self.omemo_states[account]
         devices_list = []
-        devices_list.append(str(state.own_device_id))
+        devices_list.append(state.own_device_id)
         self.publish_own_devices_list(state, devices_list)
 
 
