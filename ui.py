@@ -1,6 +1,5 @@
 import gtk
 
-from plugins.helpers import log
 
 
 class OmemoButton(gtk.Button):
@@ -12,5 +11,4 @@ class OmemoButton(gtk.Button):
         self.connect('clicked', self.on_click)
 
     def on_click(self, widget):
-        devices = self.plugin.device_ids_for(self.contact)
-        log.info(devices)
+        self.plugin.query_bundle(self.contact)

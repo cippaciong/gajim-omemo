@@ -20,7 +20,7 @@ from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log, log_calls
 
-from .iq import DeviceListAnnouncement
+from .iq import BundleInformationQuery, DeviceListAnnouncement
 from .state import OmemoState
 from .ui import OmemoButton
 
@@ -119,7 +119,6 @@ class OmemoPlugin(GajimPlugin):
         log.info(state.name + ' ⇒ Publishing own devices_list ' + str(
             devices_list))
         iq = DeviceListAnnouncement(devices_list)
-        log.info(iq)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr('id'))
         log.info(state.name + ' ⇒ IQ id: ' + str(id_))
@@ -148,6 +147,20 @@ class OmemoPlugin(GajimPlugin):
                 raise
             finally:
                 del iq_ids_to_callbacks[id_]
+
+    @log_calls('OmemoPlugin')
+    def query_bundle(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        device_ids = state.device_ids_for(contact)
+
+        for id_ in device_ids:
+            log.info(account + ' ⇒ Query Bundle for ' + contact.jid + 'device'
+                     + id_)
+            iq = BundleInformationQuery(contact.jid, id_)
+            gajim.connections[state.name].connection.send(iq)
+            iq_id = str(iq.getAttr('id'))
+            iq_ids_to_callbacks[iq_id] = lambda event: log.info(str(event))
 
 
 def anydup(thelist):
