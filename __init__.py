@@ -28,7 +28,7 @@ from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
-                 DeviceListAnnouncement, OmemoMessage)
+                 DeviceListAnnouncement, OmemoMessage, unpack_message)
 from .state import OmemoState
 from .ui import make_ui
 
@@ -94,41 +94,37 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def decrypt_msg(self, msg):
         account = msg.conn.name
-        log.info(account + ' ⇒ OMEMO msg received')
-        header = msg.stanza.getTag('encrypted',
-                                   namespace=NS_OMEMO).getTag('header')
-        key_nodes = header.getTags('key')
-        my_key_node = None
         state = self.omemo_states[account]
-        for kn in key_nodes:
-            if int(kn.getAttr('rid')) == state.own_device_id:
-                my_key_node = kn
-                break
-        if kn is None:
-            return False
+        log.info(account + ' ⇒ OMEMO msg received')
+        sender_jid = gajim.get_jid_without_resource(msg.fjid)
+        result = unpack_message(msg.stanza)
+        sid = result['sid']
+        own_id = state.own_device_id
 
-        device_id = int(header.getAttr('sid'))
-        recepient_id = gajim.get_jid_without_resource(msg.fjid)
-        iv = header.getTag('iv').getData()
-        payload = msg.stanza.getTag(
-            'encrypted',
-            namespace=NS_OMEMO).getTag('payload').getData()
-        key = my_key_node.getData()
+        if own_id not in result['keys']:
+            log.warn('OMEMO message does not contain our device key')
+            return
+
+        encrypted_key = result['keys'][own_id]
+
         try:
-            key = state.handlePreKeyWhisperMessage(recepient_id, device_id,
-                                                   key)
+            key = state.handlePreKeyWhisperMessage(sender_jid, sid,
+                                                   encrypted_key)
         except (InvalidVersionException, InvalidMessageException):
-            key = state.handleWhisperMessage(recepient_id, device_id, key)
+            key = state.handleWhisperMessage(sender_jid, sid, encrypted_key)
+
+        iv = result['iv']
+        payload = result['payload']
 
         plaintext = state.decrypt_msg(key, iv, payload)
         new_key = os.urandom(16)
         new_iv = os.urandom(16)
-        sessionCipher = state.getSessionCipher(recepient_id, device_id)
+        sessionCipher = state.getSessionCipher(sender_jid, sid)
         new_cipherkey = sessionCipher.encrypt(new_key).serialize()
         new_payload = state.encrypt_msg(new_key, new_iv, plaintext)
 
-        node = OmemoMessage(recepient_id, new_cipherkey, new_iv, new_payload,
-                            device_id, state.own_device_id)
+        node = OmemoMessage(sender_jid, new_cipherkey, new_iv, new_payload,
+                            sid, state.own_device_id)
         log.info(node)
         gajim.connections[state.name].connection.send(node)
 
