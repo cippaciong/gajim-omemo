@@ -17,18 +17,14 @@
 #
 
 import logging
-import os
 import random
-
-from axolotl.invalidmessageexception import InvalidMessageException
-from axolotl.invalidversionexception import InvalidVersionException
 
 from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
-                 DeviceListAnnouncement, OmemoMessage, unpack_message)
+                 DeviceListAnnouncement, unpack_message)
 from .state import OmemoState
 from .ui import make_ui
 
@@ -95,38 +91,20 @@ class OmemoPlugin(GajimPlugin):
     def decrypt_msg(self, msg):
         account = msg.conn.name
         state = self.omemo_states[account]
-        log.info(account + ' ⇒ OMEMO msg received')
-        sender_jid = gajim.get_jid_without_resource(msg.fjid)
+        log.debug(account + ' ⇒ OMEMO msg received')
         result = unpack_message(msg.stanza)
-        sid = result['sid']
-        own_id = state.own_device_id
+        result['sender_jid'] = gajim.get_jid_without_resource(msg.fjid)
+        log.info(state.decrypt_msg(result))
+        # new_key = os.urandom(16)
+        # new_iv = os.urandom(16)
+        # sessionCipher = state.getSessionCipher(sender_jid, sid)
+        # new_cipherkey = sessionCipher.encrypt(new_key).serialize()
+        # new_payload = state.encrypt_msg(new_key, new_iv, plaintext)
 
-        if own_id not in result['keys']:
-            log.warn('OMEMO message does not contain our device key')
-            return
-
-        encrypted_key = result['keys'][own_id]
-
-        try:
-            key = state.handlePreKeyWhisperMessage(sender_jid, sid,
-                                                   encrypted_key)
-        except (InvalidVersionException, InvalidMessageException):
-            key = state.handleWhisperMessage(sender_jid, sid, encrypted_key)
-
-        iv = result['iv']
-        payload = result['payload']
-
-        plaintext = state.decrypt_msg(key, iv, payload)
-        new_key = os.urandom(16)
-        new_iv = os.urandom(16)
-        sessionCipher = state.getSessionCipher(sender_jid, sid)
-        new_cipherkey = sessionCipher.encrypt(new_key).serialize()
-        new_payload = state.encrypt_msg(new_key, new_iv, plaintext)
-
-        node = OmemoMessage(sender_jid, new_cipherkey, new_iv, new_payload,
-                            sid, state.own_device_id)
-        log.info(node)
-        gajim.connections[state.name].connection.send(node)
+        # node = OmemoMessage(sender_jid, new_cipherkey, new_iv, new_payload,
+        # sid, state.own_device_id)
+        # log.info(node)
+        # gajim.connections[state.name].connection.send(node)
 
         return True
 
