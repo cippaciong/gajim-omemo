@@ -77,23 +77,24 @@ class OmemoPlugin(GajimPlugin):
                                                    gajim.connections[a].status)
 
     @log_calls('OmemoPlugin')
-    def _pep_received(self, pep):
+    def _pep_received(self, msg):
 
-        event = pep.stanza.getTag('event')
-        if not event:
-            return
+        if msg.stanza.getTag('event'):
+            if self._device_list_update(msg):
+                return
 
-        items = pep.stanza.getTag('event').getTag('items', {'node':
+    @log_calls('OmemoPlugin')
+    def _device_list_update(self, msg):
+        items = msg.stanza.getTag('event').getTag('items', {'node':
                                                             NS_DEVICE_LIST})
         if items and len(items.getChildren()) == 1:
-
-            account = pep.conn.name
-            contact_jid = gajim.get_jid_without_resource(pep.fjid)
+            account = msg.conn.name
+            contact_jid = gajim.get_jid_without_resource(msg.fjid)
 
             log.info(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
 
             devices = items.getChildren()[0].getTag('list').getChildren()
-            devices_list = [dev.getAttr('id') for dev in devices]
+            devices_list = [int(dev.getAttr('id')) for dev in devices]
 
             state = self.omemo_states[account]
 
@@ -112,10 +113,12 @@ class OmemoPlugin(GajimPlugin):
                     # overwritten by some other client?
                     # also remove duplicates
                     devices_list = list(set(state.own_devices))
-                    devices_list.append(str(state.own_device_id))
+                    devices_list.append(state.own_device_id)
                     self.publish_own_devices_list(state, devices_list)
             else:
                 state.add_devices(contact_jid, devices_list)
+            return True
+        return False
 
     @log_calls('OmemoPlugin')
     def publish_own_devices_list(self, state, devices_list):
