@@ -25,7 +25,7 @@ from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage, unpack_message)
-from .state import OmemoState
+from .state import NoValidSessions, OmemoState
 from .ui import make_ui
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
@@ -95,11 +95,14 @@ class OmemoPlugin(GajimPlugin):
         result = unpack_message(msg.stanza)
         result['sender_jid'] = gajim.get_jid_without_resource(msg.fjid)
         plaintext = state.decrypt_msg(result)
-        new_msg = state.create_msg(result['sender_jid'], plaintext + "\nReply")
-
-        node = OmemoMessage(new_msg)
-        log.info(node)
-        gajim.connections[state.name].connection.send(node)
+        try:
+            new_msg = state.create_msg(result['sender_jid'],
+                                       plaintext + "\nReply")
+            node = OmemoMessage(new_msg)
+            log.info(node)
+            gajim.connections[state.name].connection.send(node)
+        except (NoValidSessions):
+            return False
 
         return True
 
