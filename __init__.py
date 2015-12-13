@@ -44,8 +44,10 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def init(self):
         self.events_handlers = {
-            'message-received': (ged.CORE, self.message_received),
-            'raw-iq-received': (ged.PRECORE, self.handle_iq_received)
+            'message-received': (ged.PRECORE, self.message_received),
+            'raw-iq-received': (ged.PRECORE, self.handle_iq_received),
+            'stanza-message-outgoing':
+            (ged.PRECORE, self.handle_outgoing_msgs),
         }
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
@@ -81,7 +83,6 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
-        log.error(msg)
         if msg.stanza.getTag('event'):
             if self._device_list_update(msg):
                 return
@@ -90,10 +91,9 @@ class OmemoPlugin(GajimPlugin):
             log.info(msgtext)
             if not msgtext:
                 return
-            msg.mtype = 'chat'
-            msg.msgtext = msgtext
-            msg.stanza.setBody(msgtext)
-            msg.stanza.setAttr('type', 'chat')
+            msg.msgtxt = msgtext
+            msg.stanza.setBody(msg.msgtxt)
+            log.debug(msg.conn.name + ' → ' + msg.msgtxt)
             return False
 
     @log_calls('OmemoPlugin')
@@ -104,15 +104,6 @@ class OmemoPlugin(GajimPlugin):
         result = unpack_message(msg.stanza)
         result['sender_jid'] = gajim.get_jid_without_resource(msg.fjid)
         plaintext = state.decrypt_msg(result)
-        try:
-            new_msg = state.create_msg(result['sender_jid'],
-                                       plaintext + "\nReply")
-            node = OmemoMessage(new_msg)
-            log.info(node)
-            gajim.connections[state.name].connection.send(node)
-        except (NoValidSessions):
-            return
-
         return plaintext
 
     @log_calls('OmemoPlugin')
@@ -204,6 +195,24 @@ class OmemoPlugin(GajimPlugin):
         devices_list = []
         devices_list.append(state.own_device_id)
         self.publish_own_devices_list(state, devices_list)
+
+    @log_calls('OmemoPlugin')
+    def handle_outgoing_msgs(self, event):
+        if not event.msg_iq.getTag('body'):
+            return
+        plaintext = event.msg_iq.getBody().encode('utf8')
+        account = event.conn.name
+        state = self.omemo_states[account]
+        full_jid = str(event.msg_iq.getAttr('to'))
+        to_jid = gajim.get_jid_without_resource(full_jid)
+        try:
+            msg_dict = state.create_msg(to_jid, plaintext)
+            encrypted_node = OmemoMessage(msg_dict)
+            event.msg_iq.delChild('body')
+            event.msg_iq.addChild(node=encrypted_node)
+            log.debug(account + ' → ' + str(event.msg_iq))
+        except (NoValidSessions):
+            return
 
 
 @log_calls('OmemoPlugin')
