@@ -5,7 +5,7 @@ import gtk
 
 class PreKeyButton(gtk.Button):
     def __init__(self, plugin, contact):
-        super(PreKeyButton, self).__init__(label='Get Prekey')
+        super(PreKeyButton, self).__init__(label='Get Missing Prekeys')
         self.plugin = plugin
         self.contact = contact
         self.connect('clicked', self.on_click)

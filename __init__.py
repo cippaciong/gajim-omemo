@@ -17,14 +17,14 @@
 #
 
 import logging
-import random
 
 from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
-                 DeviceListAnnouncement, OmemoMessage, unpack_message)
+                 DeviceListAnnouncement, OmemoMessage, unpack_device_bundle,
+                 unpack_message)
 from .state import NoValidSessions, OmemoState
 from .ui import make_ui
 
@@ -170,15 +170,25 @@ class OmemoPlugin(GajimPlugin):
     def query_prekey(self, contact):
         account = contact.account.name
         state = self.omemo_states[account]
-        device_ids = state.device_ids_for(contact)
-
-        for id_ in device_ids:
-            log.info(account + ' ⇒ Query Bundle for ' + contact.jid + 'device'
-                     + id_)
-            iq = BundleInformationQuery(contact.jid, id_)
-            gajim.connections[state.name].connection.send(iq)
+        to_jid = contact.jid
+        missing_keys = state.find_missing_sessions(to_jid)
+        for k in missing_keys:
+            log.info('Missing key ⇒ ' + str(k))
+            iq = BundleInformationQuery(to_jid, k)
             iq_id = str(iq.getAttr('id'))
-            iq_ids_to_callbacks[iq_id] = random_prekey
+            iq_ids_to_callbacks[iq_id] = \
+                lambda stanza: self.session_from_prekey_bundle(account,
+                                                               stanza,
+                                                               k)
+            gajim.connections[state.name].connection.send(iq)
+
+    def session_from_prekey_bundle(self, account, stanza, device_id):
+        log.info(account)
+        # state = self.omemo_states[account]
+        bundle_dict = unpack_device_bundle(stanza, device_id)
+        if not bundle_dict:
+            log.warn('Failed requesting a bundle')
+        log.info(bundle_dict)
 
     @log_calls('OmemoPlugin')
     def publish_bundle(self, account):
@@ -186,7 +196,7 @@ class OmemoPlugin(GajimPlugin):
         iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
-        iq_ids_to_callbacks[id_] = lambda event: log.info(event)
+        iq_ids_to_callbacks[id_] = lambda event: log.info(event.stanza)
 
     @log_calls('OmemoPlugin')
     def clear_device_list(self, contact):
@@ -213,15 +223,6 @@ class OmemoPlugin(GajimPlugin):
             log.debug(account + ' → ' + str(event.msg_iq))
         except (NoValidSessions):
             return
-
-
-@log_calls('OmemoPlugin')
-def random_prekey(event):
-    prekeys = event.getTag('pubsub').getTag('items').getTag('item').getTag(
-        'bundle').getTag('prekeys').getChildren()
-    result = random.SystemRandom().choice(prekeys)
-    log.info(event.name + ' ⇒ Random Prekey for  ' + str(event.getAttr('from'))
-             + ': ' + str(result.getData()))
 
 
 def anydup(thelist):
