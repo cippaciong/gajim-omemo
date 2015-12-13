@@ -177,18 +177,21 @@ class OmemoPlugin(GajimPlugin):
             iq = BundleInformationQuery(to_jid, k)
             iq_id = str(iq.getAttr('id'))
             iq_ids_to_callbacks[iq_id] = \
-                lambda stanza: self.session_from_prekey_bundle(account,
+                lambda stanza: self.session_from_prekey_bundle(state,
                                                                stanza,
+                                                               to_jid,
                                                                k)
             gajim.connections[state.name].connection.send(iq)
 
-    def session_from_prekey_bundle(self, account, stanza, device_id):
-        log.info(account)
-        # state = self.omemo_states[account]
+    def session_from_prekey_bundle(self, state, stanza, recipient_id,
+                                   device_id):
         bundle_dict = unpack_device_bundle(stanza, device_id)
         if not bundle_dict:
             log.warn('Failed requesting a bundle')
+            return
         log.info(bundle_dict)
+
+        state.build_session(recipient_id, device_id, bundle_dict)
 
     @log_calls('OmemoPlugin')
     def publish_bundle(self, account):
