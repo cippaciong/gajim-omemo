@@ -171,17 +171,24 @@ class OmemoPlugin(GajimPlugin):
         account = contact.account.name
         state = self.omemo_states[account]
         to_jid = contact.jid
+        my_jid = gajim.get_jid_from_account(account)
         missing_keys = state.find_missing_sessions(to_jid)
         for k in missing_keys:
-            log.info('Missing key ⇒ ' + str(k))
-            iq = BundleInformationQuery(to_jid, k)
-            iq_id = str(iq.getAttr('id'))
-            iq_ids_to_callbacks[iq_id] = \
-                lambda stanza: self.session_from_prekey_bundle(state,
-                                                               stanza,
-                                                               to_jid,
-                                                               k)
-            gajim.connections[state.name].connection.send(iq)
+            self._query_prekey(state, to_jid, k)
+
+        for k in state.find_own_missing_sessions(my_jid):
+            self._query_prekey(state, my_jid, k)
+
+    def _query_prekey(self, state, jid, key):
+        log.info('Query prekey bundles ⇒ ' + str(key) + 'for: ' + jid)
+        iq = BundleInformationQuery(jid, key)
+        iq_id = str(iq.getAttr('id'))
+        iq_ids_to_callbacks[iq_id] = \
+            lambda stanza: self.session_from_prekey_bundle(state,
+                                                           stanza,
+                                                           jid,
+                                                           key)
+        gajim.connections[state.name].connection.send(iq)
 
     def session_from_prekey_bundle(self, state, stanza, recipient_id,
                                    device_id):
