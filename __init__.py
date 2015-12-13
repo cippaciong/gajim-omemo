@@ -81,11 +81,20 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
+        log.error(msg)
         if msg.stanza.getTag('event'):
             if self._device_list_update(msg):
                 return
         if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
-            self.decrypt_msg(msg)
+            msgtext = self.decrypt_msg(msg)
+            log.info(msgtext)
+            if not msgtext:
+                return
+            msg.mtype = 'chat'
+            msg.msgtext = msgtext
+            msg.stanza.setBody(msgtext)
+            msg.stanza.setAttr('type', 'chat')
+            return False
 
     @log_calls('OmemoPlugin')
     def decrypt_msg(self, msg):
@@ -102,9 +111,9 @@ class OmemoPlugin(GajimPlugin):
             log.info(node)
             gajim.connections[state.name].connection.send(node)
         except (NoValidSessions):
-            return False
+            return
 
-        return True
+        return plaintext
 
     @log_calls('OmemoPlugin')
     def _device_list_update(self, msg):
