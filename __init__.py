@@ -263,6 +263,8 @@ class OmemoPlugin(GajimPlugin):
         to_jid = gajim.get_jid_without_resource(full_jid)
         try:
             msg_dict = state.create_msg(to_jid, plaintext)
+            if not msg_dict:
+                return True
             encrypted_node = OmemoMessage(msg_dict)
             event.msg_iq.delChild('body')
             event.msg_iq.addChild(node=encrypted_node)
