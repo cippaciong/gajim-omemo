@@ -154,7 +154,8 @@ class OmemoPlugin(GajimPlugin):
                     self.publish_own_devices_list(state)
             else:
                 state.add_devices(contact_jid, devices_list)
-                self.ui_list[account][contact_jid].toggle_omemo(True)
+                if account in self.ui_list:
+                    self.ui_list[account][contact_jid].toggle_omemo(True)
             return True
         return False
 
