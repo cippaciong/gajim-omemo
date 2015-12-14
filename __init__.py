@@ -41,11 +41,14 @@ class OmemoPlugin(GajimPlugin):
 
     omemo_states = {}
 
+    published_bundles = {}
+
     @log_calls('OmemoPlugin')
     def init(self):
         self.events_handlers = {
             'message-received': (ged.PRECORE, self.message_received),
             'raw-iq-received': (ged.PRECORE, self.handle_iq_received),
+            'our-show': (ged.PRECORE, self.handle_show),
             'stanza-message-outgoing':
             (ged.PRECORE, self.handle_outgoing_msgs),
         }
@@ -54,6 +57,20 @@ class OmemoPlugin(GajimPlugin):
                                      (self.connect_ui, None)}
         for account in gajim.contacts.get_accounts():
             self.omemo_states[account] = OmemoState(account)
+
+    @log_calls('OmemoPlugin')
+    def handle_show(self, show):
+        log.info('SHOW Changed ' + show.show)
+        account = show.conn.name
+        if show.show != 'offline' and account not in self.published_bundles:
+            log.info(account + ' Need to publish bundle')
+            state = self.omemo_states[account]
+            self.publish_bundle(state)
+            self.published_bundles[account] = True
+        elif show.show == 'offline':
+            log.info(account + ' Going offline bundle')
+            self.published_bundles.pop(account, None)
+            log.info(self.published_bundles)
 
     @log_calls('OmemoPlugin')
     def activate(self):
@@ -124,7 +141,7 @@ class OmemoPlugin(GajimPlugin):
             my_jid = gajim.get_jid_from_account(account)
 
             if contact_jid == my_jid:
-                log.debug(state.name + ' ⇒ Received own device_list ' + str(
+                log.info(state.name + ' ⇒ Received own device_list ' + str(
                     devices_list))
                 state.add_own_devices(devices_list)
 
@@ -135,15 +152,21 @@ class OmemoPlugin(GajimPlugin):
                     # also remove duplicates
                     devices_list = list(set(state.own_devices))
                     devices_list.append(state.own_device_id)
-                    self.publish_own_devices_list(state, devices_list)
+                    self.publish_own_devices_list(state)
             else:
                 state.add_devices(contact_jid, devices_list)
             return True
         return False
 
     @log_calls('OmemoPlugin')
-    def publish_own_devices_list(self, state, devices_list):
-        log.debug(state.name + ' ⇒ Publishing own devices_list ' + str(
+    def publish_own_devices_list(self, state):
+        if not state.own_device_id_published():
+            return
+
+        devices_list = state.own_devices
+        devices_list += state.own_device_id
+
+        log.info(state.name + ' ⇒ Publishing own devices_list ' + str(
             devices_list))
         iq = DeviceListAnnouncement(devices_list)
         gajim.connections[state.name].connection.send(iq)
@@ -206,7 +229,9 @@ class OmemoPlugin(GajimPlugin):
         iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
-        iq_ids_to_callbacks[id_] = lambda event: log.info(event.stanza)
+        log.info("PUBLISHING BUNDLE " + account.name)
+        iq_ids_to_callbacks[
+            id_] = lambda event: self.publish_own_devices_list(state)
 
     @log_calls('OmemoPlugin')
     def clear_device_list(self, contact):
@@ -214,7 +239,6 @@ class OmemoPlugin(GajimPlugin):
         state = self.omemo_states[account]
         devices_list = []
         devices_list.append(state.own_device_id)
-        self.publish_own_devices_list(state, devices_list)
 
     @log_calls('OmemoPlugin')
     def handle_outgoing_msgs(self, event):
