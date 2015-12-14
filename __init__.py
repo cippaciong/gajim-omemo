@@ -60,7 +60,6 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def handle_show(self, show):
-        log.info('SHOW Changed ' + show.show)
         account = show.conn.name
         if show.show != 'offline' and account not in self.published_bundles:
             state = self.omemo_states[account]
@@ -102,7 +101,6 @@ class OmemoPlugin(GajimPlugin):
                 return
         if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
             msgtext = self.decrypt_msg(msg)
-            log.info(msgtext)
             if not msgtext:
                 return
             msg.msgtxt = msgtext
@@ -128,7 +126,7 @@ class OmemoPlugin(GajimPlugin):
             account = msg.conn.name
             contact_jid = gajim.get_jid_without_resource(msg.fjid)
 
-            log.info(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
+            log.debug(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
 
             devices = items.getChildren()[0].getTag('list').getChildren()
             devices_list = [int(dev.getAttr('id')) for dev in devices]
@@ -138,7 +136,7 @@ class OmemoPlugin(GajimPlugin):
             my_jid = gajim.get_jid_from_account(account)
 
             if contact_jid == my_jid:
-                log.info(state.name + ' ⇒ Received own device_list ' + str(
+                log.debug(state.name + ' ⇒ Received own device_list ' + str(
                     devices_list))
                 state.add_own_devices(devices_list)
 
@@ -160,12 +158,12 @@ class OmemoPlugin(GajimPlugin):
         devices_list = state.own_devices
         devices_list += [state.own_device_id]
 
-        log.info(state.name + ' ⇒ Publishing own devices_list ' + str(
+        log.debug(state.name + ' ⇒ Publishing own devices_list ' + str(
             devices_list))
         iq = DeviceListAnnouncement(devices_list)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr('id'))
-        iq_ids_to_callbacks[id_] = lambda event: log.info(event)
+        iq_ids_to_callbacks[id_] = lambda event: log.debug(event)
 
     @log_calls('OmemoPlugin')
     def connect_ui(plugin, chat_control):
@@ -196,8 +194,9 @@ class OmemoPlugin(GajimPlugin):
         for k in state.find_own_missing_sessions(my_jid):
             self._query_prekey(state, my_jid, k)
 
+    @log_calls('OmemoPlugin')
     def _query_prekey(self, state, jid, key):
-        log.info('Query prekey bundles ⇒ ' + str(key) + 'for: ' + jid)
+        log.debug('Query prekey bundles ⇒ ' + str(key) + 'for: ' + jid)
         iq = BundleInformationQuery(jid, key)
         iq_id = str(iq.getAttr('id'))
         iq_ids_to_callbacks[iq_id] = \
@@ -207,13 +206,13 @@ class OmemoPlugin(GajimPlugin):
                                                            key)
         gajim.connections[state.name].connection.send(iq)
 
+    @log_calls('OmemoPlugin')
     def session_from_prekey_bundle(self, state, stanza, recipient_id,
                                    device_id):
         bundle_dict = unpack_device_bundle(stanza, device_id)
         if not bundle_dict:
             log.warn('Failed requesting a bundle')
             return
-        log.info(bundle_dict)
 
         state.build_session(recipient_id, device_id, bundle_dict)
 
@@ -223,7 +222,7 @@ class OmemoPlugin(GajimPlugin):
         iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
-        log.info("PUBLISHING BUNDLE " + account.name)
+        log.debug(account.name + " → PUBLISHING BUNDLE ")
         iq_ids_to_callbacks[id_] = lambda stanza: \
             self.publish_bundle_result(stanza, state)
 
@@ -232,7 +231,7 @@ class OmemoPlugin(GajimPlugin):
         account = state.name
         state = self.omemo_states[account]
         if successful(stanza):
-            log.info(account + ' → Publishing bundle was successful')
+            log.debug(account + ' → Publishing bundle was successful')
             if not state.own_device_id_published():
                 log.debug(account + ' → Device list needs updating')
                 self.publish_own_devices_list(state)
@@ -251,7 +250,7 @@ class OmemoPlugin(GajimPlugin):
         iq = DeviceListAnnouncement(devices_list)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr('id'))
-        iq_ids_to_callbacks[id_] = lambda event: log.debug(event)
+        iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
     @log_calls('OmemoPlugin')
     def handle_outgoing_msgs(self, event):
@@ -272,6 +271,7 @@ class OmemoPlugin(GajimPlugin):
             return
 
 
+@log_calls('OmemoPlugin')
 def anydup(thelist):
     seen = set()
     for x in thelist:
