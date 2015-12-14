@@ -8,7 +8,6 @@ Experimental plugin that adds support for the [OMEMO Encryption](http://conversa
 All dependencies can be installed with ```pip```. (Depending on your setup you might want to use ```pip2``` as Gajim is using python2.7)
 
 * python-axolotl
-* pycryptodome
 
 ### Installation
 Clone the git repository into Gajims plugin directory.
