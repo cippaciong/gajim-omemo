@@ -120,8 +120,10 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def _device_list_update(self, msg):
-        items = msg.stanza.getTag('event').getTag('items', {'node':
-                                                            NS_DEVICE_LIST})
+        event_node = msg.stanza.getTag('event')
+        if not event_node:
+            log.info('Event node empty!')
+        items = event_node.getTag('items', {'node': NS_DEVICE_LIST})
         if items and len(items.getChildren()) == 1:
             account = msg.conn.name
             contact_jid = gajim.get_jid_without_resource(msg.fjid)
