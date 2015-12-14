@@ -26,7 +26,7 @@ from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage, successful,
                  unpack_device_bundle, unpack_message)
 from .state import NoValidSessions, OmemoState
-from .ui import make_ui
+from .ui import Ui
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
 NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
@@ -42,6 +42,8 @@ class OmemoPlugin(GajimPlugin):
     omemo_states = {}
 
     published_bundles = {}
+
+    ui_list = {}
 
     @log_calls('OmemoPlugin')
     def init(self):
@@ -152,6 +154,7 @@ class OmemoPlugin(GajimPlugin):
                     self.publish_own_devices_list(state)
             else:
                 state.add_devices(contact_jid, devices_list)
+                self.ui_list[account][contact_jid].toggle_omemo(True)
             return True
         return False
 
@@ -168,8 +171,13 @@ class OmemoPlugin(GajimPlugin):
         iq_ids_to_callbacks[id_] = lambda event: log.debug(event)
 
     @log_calls('OmemoPlugin')
-    def connect_ui(plugin, chat_control):
-        make_ui(plugin, chat_control)
+    def connect_ui(self, chat_control):
+        log.info("DRIN")
+        account = chat_control.contact.account.name
+        jid = chat_control.contact.jid
+        if account not in self.ui_list:
+            self.ui_list[account] = {}
+        self.ui_list[account][jid] = Ui(self, chat_control)
 
     @log_calls('OmemoPlugin')
     def handle_iq_received(self, event):
@@ -263,6 +271,8 @@ class OmemoPlugin(GajimPlugin):
         state = self.omemo_states[account]
         full_jid = str(event.msg_iq.getAttr('to'))
         to_jid = gajim.get_jid_without_resource(full_jid)
+        if to_jid not in state.omemo_enabled:
+            return False
         try:
             msg_dict = state.create_msg(to_jid, plaintext)
             if not msg_dict:
@@ -273,6 +283,23 @@ class OmemoPlugin(GajimPlugin):
             log.debug(account + ' → ' + str(event.msg_iq))
         except (NoValidSessions):
             return
+
+    def omemo_enable_for(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        state.omemo_enabled |= {contact.jid}
+
+    def omemo_disable_for(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        state.omemo_enabled.remove(contact.jid)
+
+    def has_omemo(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        if state.device_ids_for(contact):
+            return True
+        return False
 
 
 @log_calls('OmemoPlugin')
