@@ -25,7 +25,7 @@ from plugins.helpers import log_calls
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage, successful,
                  unpack_device_bundle, unpack_message)
-from .state import NoValidSessions, OmemoState
+from .state import OmemoState
 from .ui import Ui
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
@@ -290,8 +290,8 @@ class OmemoPlugin(GajimPlugin):
             event.msg_iq.delChild('body')
             event.msg_iq.addChild(node=encrypted_node)
             log.debug(account + ' → ' + str(event.msg_iq))
-        except (NoValidSessions):
-            return
+        except:
+            return True
 
     def omemo_enable_for(self, contact):
         account = contact.account.name
