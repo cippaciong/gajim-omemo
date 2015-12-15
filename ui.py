@@ -70,6 +70,9 @@ def _add_widget(widget, chat_control):
 
 
 class Ui(object):
+
+    last_msg_plain = True
+
     def __init__(self, plugin, chat_control):
         contact = chat_control.contact
         self.prekey_button = PreKeyButton(plugin, contact)
@@ -99,14 +102,21 @@ class Ui(object):
         return self.checkbox.set_active(False)
 
     def activate_omemo(self):
-        self.checkbox.set_active(True)
-        self.chat_control.print_conversation_line('OMEMO encryption activated',
-                                                  'status', '', None)
-        self.chat_control._show_lock_image(True, 'OMEMO', True, True, True)
+        if not self.checkbox.get_active():
+            self.chat_control.print_conversation_line(
+                'OMEMO encryption activated', 'status', '', None)
+            self.chat_control._show_lock_image(True, 'OMEMO', True, True, True)
+            self.checkbox.set_active(True)
+        elif self.last_msg_plain:
+            self.chat_control.print_conversation_line(
+                'OMEMO encryption activated', 'status', '', None)
+            self.last_msg_plain = False
 
     def plain_warning(self):
-        self.chat_control.print_conversation_line(
-            'Received plaintext message!', 'status', '', None)
+        if not self.last_msg_plain:
+            self.chat_control.print_conversation_line(
+                'Received plaintext message!', 'status', '', None)
+        self.last_msg_plain = True
 
     def update_prekeys(self):
         self.prekey_button.refresh()
