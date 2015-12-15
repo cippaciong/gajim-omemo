@@ -200,12 +200,13 @@ class OmemoPlugin(GajimPlugin):
         self.ui_list[account][jid] = Ui(self, chat_control)
 
     def are_keys_missing(self, contact):
+        """ Used by the ui to set the state of the PreKeyButton. """
         account = contact.account.name
         my_jid = gajim.get_jid_from_account(account)
         state = self.omemo_states[account]
         result = 0
-        result += len(state.find_missing_sessions(str(contact.jid)))
-        result += len(state.find_own_missing_sessions(my_jid))
+        result += len(state.devices_without_sessions(str(contact.jid)))
+        result += len(state.own_devices_without_sessions(my_jid))
         return result
 
     @log_calls('OmemoPlugin')
@@ -226,10 +227,10 @@ class OmemoPlugin(GajimPlugin):
         state = self.omemo_states[account]
         to_jid = contact.jid
         my_jid = gajim.get_jid_from_account(account)
-        for device_id in state.find_missing_sessions(to_jid):
+        for device_id in state.devices_without_sessions(to_jid):
             self.fetch_device_bundle_information(state, to_jid, device_id)
 
-        for device_id in state.find_own_missing_sessions(my_jid):
+        for device_id in state.own_devices_without_sessions(my_jid):
             self.fetch_device_bundle_information(state, my_jid, device_id)
 
     @log_calls('OmemoPlugin')
