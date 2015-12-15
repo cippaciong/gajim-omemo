@@ -102,7 +102,11 @@ class OmemoPlugin(GajimPlugin):
             log.debug(account + ' ⇒ OMEMO msg received')
 
             state = self.omemo_states[account]
-            from_jid = str(msg.stanza.getAttr('from'))
+            if msg.forwarded and msg.sent:
+                from_jid = str(msg.stanza.getAttr('to')) #why gajim? why?
+                log.debug('message was forwarded doing magic')
+            else:
+                from_jid = str(msg.stanza.getAttr('from'))
 
             msg_dict = unpack_message(msg.stanza)
             msg_dict['sender_jid'] = gajim.get_jid_without_resource(from_jid)
