@@ -79,16 +79,19 @@ class Ui(object):
         self.checkbox = Checkbox(plugin, chat_control)
         self.clear_button = ClearDevicesButton(plugin, contact)
 
-        enabled = plugin.has_omemo(contact)
-        self.toggle_omemo(enabled)
+        available = plugin.has_omemo(contact)
+        self.toggle_omemo(available)
+
+        self.checkbox.set_active(plugin.is_omemo_enabled(contact))
+        
         self.chat_control = chat_control
 
         _add_widget(self.prekey_button, chat_control)
         _add_widget(self.checkbox, chat_control)
         _add_widget(self.clear_button, chat_control)
 
-    def toggle_omemo(self, enabled):
-        if enabled:
+    def toggle_omemo(self, available):
+        if available:
             self.checkbox.set_no_show_all(False)
             self.checkbox.show()
         else:

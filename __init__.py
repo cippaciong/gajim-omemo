@@ -405,6 +405,12 @@ class OmemoPlugin(GajimPlugin):
             return True
 
     @log_calls('OmemoPlugin')
+    def is_omemo_enabled(self, contact):
+        account = contact.account.name
+        state = self.omemo_states[account]
+        return contact.jid in state.omemo_enabled
+
+    @log_calls('OmemoPlugin')
     def omemo_enable_for(self, contact):
         """ Used by the ui to enable omemo for a specified contact """
         account = contact.account.name
