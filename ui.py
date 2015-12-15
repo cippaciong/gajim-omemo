@@ -42,10 +42,11 @@ class ClearDevicesButton(gtk.Button):
 
 
 class Checkbox(gtk.CheckButton):
-    def __init__(self, plugin, contact):
+    def __init__(self, plugin, chat_control):
         super(Checkbox, self).__init__(label='OMEMO')
+        self.chat_control = chat_control
+        self.contact = chat_control.contact
         self.plugin = plugin
-        self.contact = contact
         self.connect('clicked', self.on_click)
 
     def on_click(self, widget):
@@ -53,8 +54,11 @@ class Checkbox(gtk.CheckButton):
         log.info('Clicked ' + str(enabled))
         if enabled:
             self.plugin.omemo_enable_for(self.contact)
+            self.chat_control._show_lock_image(True, 'OMEMO', True, True, True)
         else:
             self.plugin.omemo_disable_for(self.contact)
+            self.chat_control._show_lock_image(False, 'OMEMO', False, True,
+                                               False)
 
 
 def _add_widget(widget, chat_control):
@@ -69,11 +73,12 @@ class Ui(object):
     def __init__(self, plugin, chat_control):
         contact = chat_control.contact
         self.prekey_button = PreKeyButton(plugin, contact)
-        self.checkbox = Checkbox(plugin, contact)
+        self.checkbox = Checkbox(plugin, chat_control)
         self.clear_button = ClearDevicesButton(plugin, contact)
 
         enabled = plugin.has_omemo(contact)
         self.toggle_omemo(enabled)
+        self.chat_control = chat_control
 
         _add_widget(self.prekey_button, chat_control)
         _add_widget(self.checkbox, chat_control)
@@ -89,6 +94,7 @@ class Ui(object):
 
     def activate_omemo(self):
         self.checkbox.set_active(True)
+        self.chat_control._show_lock_image(True, 'OMEMO', True, True, True)
 
     def update_prekeys(self):
         self.prekey_button.refresh()
