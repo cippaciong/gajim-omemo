@@ -102,30 +102,29 @@ class OmemoPlugin(GajimPlugin):
             if self._device_list_update(msg):
                 return
         if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
-            msgtext = self.decrypt_msg(msg)
-            if not msgtext:
-                return
-            msg.msgtxt = msgtext
-            msg.stanza.setBody(msg.msgtxt)
-            log.debug(msg.conn.name + ' → ' + msg.msgtxt)
             account = msg.conn.name
+            log.debug(account + ' ⇒ OMEMO msg received')
+
+            state = self.omemo_states[account]
+            from_jid = str(msg.stanza.getAttr('from'))
+
+            msg_dict = unpack_message(msg.stanza)
+            msg_dict['sender_jid'] = gajim.get_jid_without_resource(from_jid)
+            plaintext = state.decrypt_msg(msg_dict)
+
+            if not plaintext:
+                return
+
+            msg.msgtxt = plaintext
+            msg.stanza.setBody(msg.msgtxt)
+
+            self.update_prekeys(account, msg_dict['sender_jid'])
+
             contact_jid = gajim.get_jid_without_resource(msg.fjid)
             if account in self.ui_list and \
                     contact_jid in self.ui_list[account]:
                 self.ui_list[account][contact_jid].activate_omemo()
             return False
-
-    @log_calls('OmemoPlugin')
-    def decrypt_msg(self, msg):
-        account = msg.conn.name
-        state = self.omemo_states[account]
-        log.debug(account + ' ⇒ OMEMO msg received')
-        result = unpack_message(msg.stanza)
-        from_jid = str(msg.stanza.getAttr('from'))
-        result['sender_jid'] = gajim.get_jid_without_resource(from_jid)
-        plaintext = state.decrypt_msg(result)
-        self.update_prekeys(account, result['sender_jid'])
-        return plaintext
 
     @log_calls('OmemoPlugin')
     def _device_list_update(self, msg):
