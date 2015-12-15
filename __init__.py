@@ -22,12 +22,12 @@ from common import caps_cache, gajim, ged
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
-from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
-                 DeviceListAnnouncement, OmemoMessage, successful,
-                 unpack_device_bundle, unpack_device_list_update,
-                 unpack_message, NS_NOTIFY, NS_OMEMO)
 from .state import OmemoState
 from .ui import Ui
+from .xmpp import (NS_NOTIFY, NS_OMEMO, BundleInformationAnnouncement,
+                   BundleInformationQuery, DeviceListAnnouncement,
+                   OmemoMessage, successful, unpack_device_bundle,
+                   unpack_device_list_update, unpack_message)
 
 iq_ids_to_callbacks = {}
 

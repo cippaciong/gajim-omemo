@@ -16,6 +16,10 @@
 # along with Gajim.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+""" This module handles all the XMPP logic like creating different kind of
+stanza nodes and geting data from stanzas.
+"""
+
 import logging
 import random
 from base64 import b64decode, b64encode
@@ -283,7 +287,8 @@ def unpack_device_list_update(event):
     if not items or len(items.getChildren()) != 1:
         log.debug(
             account +
-            ' → Device list update items node empty or not omemo device update')
+            ' → Device list update items node empty or not omemo device update'
+            )
         return result
 
     list_node = items.getChildren()[0].getTag('list')
