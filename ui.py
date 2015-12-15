@@ -92,9 +92,21 @@ class Ui(object):
             self.checkbox.set_no_show_all(True)
             self.checkbox.hide()
 
+    def encryption_active(self):
+        return self.checkbox.get_active()
+
+    def encryption_disable(self):
+        return self.checkbox.set_active(False)
+
     def activate_omemo(self):
         self.checkbox.set_active(True)
+        self.chat_control.print_conversation_line('OMEMO encryption activated',
+                                                  'status', '', None)
         self.chat_control._show_lock_image(True, 'OMEMO', True, True, True)
+
+    def plain_warning(self):
+        self.chat_control.print_conversation_line(
+            'Received plaintext message!', 'status', '', None)
 
     def update_prekeys(self):
         self.prekey_button.refresh()

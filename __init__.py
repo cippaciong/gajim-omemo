@@ -121,6 +121,13 @@ class OmemoPlugin(GajimPlugin):
                     contact_jid in self.ui_list[account]:
                 self.ui_list[account][contact_jid].activate_omemo()
             return False
+        elif msg.stanza.getTag('body'):
+            account = msg.conn.name
+            from_jid = str(msg.stanza.getAttr('from'))
+            jid = gajim.get_jid_without_resource(from_jid)
+            gui = self.ui_list[account][jid]
+            if gui and gui.encryption_active():
+                gui.plain_warning()
 
     @log_calls('OmemoPlugin')
     def handle_device_list_update(self, event):
