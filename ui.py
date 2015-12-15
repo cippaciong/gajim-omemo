@@ -14,12 +14,18 @@ class PreKeyButton(gtk.Button):
         self.plugin = plugin
         self.contact = contact
         self.connect('clicked', self.on_click)
+        self.set_no_show_all(True)
+        self.hide()
 
     def refresh(self):
         amount = self.plugin.are_keys_missing(self.contact)
         if amount == 0:
             self.hide()
+            self.set_no_show_all(True)
+            self.hide()
         else:
+            self.show()
+            self.set_no_show_all(False)
             self.show()
         self.set_label('Missing Prekeys ' + str(amount))
 
@@ -80,13 +86,9 @@ class Ui(object):
         if enabled:
             self.checkbox.set_no_show_all(False)
             self.checkbox.show()
-            self.prekey_button.set_no_show_all(False)
-            self.prekey_button.show()
         else:
             self.checkbox.set_no_show_all(True)
             self.checkbox.hide()
-            self.prekey_button.set_no_show_all(True)
-            self.prekey_button.hide()
 
     def activate_omemo(self):
         self.checkbox.set_active(True)
