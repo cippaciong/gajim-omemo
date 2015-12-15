@@ -24,7 +24,8 @@ from plugins.helpers import log_calls
 
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage, successful,
-                 unpack_device_bundle, unpack_message)
+                 unpack_device_bundle, unpack_device_list_update,
+                 unpack_message)
 from .state import OmemoState
 from .ui import Ui
 
@@ -98,10 +99,9 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
-        if msg.stanza.getTag('event'):
-            if self._device_list_update(msg):
-                return
-        if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
+        if msg.stanza.getTag('event') and self._device_list_update(msg):
+            return
+        elif msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
             account = msg.conn.name
             log.debug(account + ' ⇒ OMEMO msg received')
 
@@ -128,44 +128,39 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def _device_list_update(self, msg):
-        event_node = msg.stanza.getTag('event')
-        if not event_node:
-            log.info('Event node empty!')
-        items = event_node.getTag('items', {'node': NS_DEVICE_LIST})
-        if items and len(items.getChildren()) == 1:
-            account = msg.conn.name
-            contact_jid = gajim.get_jid_without_resource(msg.fjid)
+        account = msg.conn.name
+        contact_jid = gajim.get_jid_without_resource(msg.fjid)
+        devices_list = unpack_device_list_update(msg)
+        state = self.omemo_states[account]
+        my_jid = gajim.get_jid_from_account(account)
 
-            log.debug(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
+        log.debug(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
 
-            devices = items.getChildren()[0].getTag('list').getChildren()
-            devices_list = [int(dev.getAttr('id')) for dev in devices]
+        if len(devices_list) == 0:
+            return False
 
-            state = self.omemo_states[account]
+        if contact_jid == my_jid:
+            log.debug(state.name + ' ⇒ Received own device_list ' + str(
+                devices_list))
+            state.add_own_devices(devices_list)
 
-            my_jid = gajim.get_jid_from_account(account)
+            if not state.own_device_id_published() or anydup(
+                    state.own_devices):
+                # Our own device_id is not in the list, it could be
+                # overwritten by some other client?
+                # also remove duplicates
+                devices_list = list(set(state.own_devices))
+                devices_list.append(state.own_device_id)
+                self.publish_own_devices_list(state)
+        else:
+            state.add_devices(contact_jid, devices_list)
+            if account in self.ui_list and contact_jid in self.ui_list[
+                    account]:
+                self.ui_list[account][contact_jid].toggle_omemo(True)
 
-            if contact_jid == my_jid:
-                log.debug(state.name + ' ⇒ Received own device_list ' + str(
-                    devices_list))
-                state.add_own_devices(devices_list)
+        self.update_prekeys(account, contact_jid)
 
-                if not state.own_device_id_published() or anydup(
-                        state.own_devices):
-                    # Our own device_id is not in the list, it could be
-                    # overwritten by some other client?
-                    # also remove duplicates
-                    devices_list = list(set(state.own_devices))
-                    devices_list.append(state.own_device_id)
-                    self.publish_own_devices_list(state)
-            else:
-                state.add_devices(contact_jid, devices_list)
-                if account in self.ui_list and contact_jid in self.ui_list[
-                        account]:
-                    self.ui_list[account][contact_jid].toggle_omemo(True)
-                self.update_prekeys(account, contact_jid)
-            return True
-        return False
+        return True
 
     @log_calls('OmemoPlugin')
     def publish_own_devices_list(self, state):
