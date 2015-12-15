@@ -124,6 +124,7 @@ class OmemoPlugin(GajimPlugin):
         from_jid = str(msg.stanza.getAttr('from'))
         result['sender_jid'] = gajim.get_jid_without_resource(from_jid)
         plaintext = state.decrypt_msg(result)
+        self.update_prekeys(account, result['sender_jid'])
         return plaintext
 
     @log_calls('OmemoPlugin')
@@ -163,6 +164,7 @@ class OmemoPlugin(GajimPlugin):
                 if account in self.ui_list and contact_jid in self.ui_list[
                         account]:
                     self.ui_list[account][contact_jid].toggle_omemo(True)
+                self.update_prekeys(account, contact_jid)
             return True
         return False
 
@@ -186,6 +188,15 @@ class OmemoPlugin(GajimPlugin):
         if account not in self.ui_list:
             self.ui_list[account] = {}
         self.ui_list[account][jid] = Ui(self, chat_control)
+
+    def are_keys_missing(self, contact):
+        account = contact.account.name
+        my_jid = gajim.get_jid_from_account(account)
+        state = self.omemo_states[account]
+        result = 0
+        result += len(state.find_missing_sessions(str(contact.jid)))
+        result += len(state.find_own_missing_sessions(my_jid))
+        return result
 
     @log_calls('OmemoPlugin')
     def handle_iq_received(self, event):
@@ -233,6 +244,12 @@ class OmemoPlugin(GajimPlugin):
             return
 
         state.build_session(recipient_id, device_id, bundle_dict)
+        self.update_prekeys(state.name, recipient_id)
+
+    def update_prekeys(self, account, recipient_id):
+        if account in self.ui_list:
+            if recipient_id in self.ui_list[account]:
+                self.ui_list[account][recipient_id].update_prekeys()
 
     @log_calls('OmemoPlugin')
     def publish_bundle(self, account):

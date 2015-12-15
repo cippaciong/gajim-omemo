@@ -9,10 +9,19 @@ log = logging.getLogger('gajim.plugin_system.omemo')
 
 class PreKeyButton(gtk.Button):
     def __init__(self, plugin, contact):
-        super(PreKeyButton, self).__init__(label='Get Missing Prekeys')
+        super(PreKeyButton, self).__init__(label='Get Missing Prekeys ' + str(
+            plugin.are_keys_missing(contact)))
         self.plugin = plugin
         self.contact = contact
         self.connect('clicked', self.on_click)
+
+    def refresh(self):
+        amount = self.plugin.are_keys_missing(self.contact)
+        if amount == 0:
+            self.hide()
+        else:
+            self.show()
+        self.set_label('Missing Prekeys ' + str(amount))
 
     def on_click(self, widget):
         self.plugin.query_prekey(self.contact)
@@ -81,3 +90,6 @@ class Ui(object):
 
     def activate_omemo(self):
         self.checkbox.set_active(True)
+
+    def update_prekeys(self):
+        self.prekey_button.refresh()
