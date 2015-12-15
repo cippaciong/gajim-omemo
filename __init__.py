@@ -397,17 +397,30 @@ class OmemoPlugin(GajimPlugin):
         except:
             return True
 
+    @log_calls('OmemoPlugin')
     def omemo_enable_for(self, contact):
+        """ Used by the ui to enable omemo for a specified contact """
         account = contact.account.name
         state = self.omemo_states[account]
         state.omemo_enabled |= {contact.jid}
 
+    @log_calls('OmemoPlugin')
     def omemo_disable_for(self, contact):
+        """ Used by the ui to disable omemo for a specified contact """
         account = contact.account.name
         state = self.omemo_states[account]
         state.omemo_enabled.remove(contact.jid)
 
+    @log_calls('OmemoPlugin')
     def has_omemo(self, contact):
+        """ Used by the ui to find out if omemo controls shoudl be displayed for
+            the given contact.
+
+            Returns
+            -------
+            bool
+                True if there are known device_ids/clients supporting OMEMO
+        """
         account = contact.account.name
         state = self.omemo_states[account]
         if state.device_ids_for(contact):
