@@ -226,21 +226,33 @@ class OmemoPlugin(GajimPlugin):
         state = self.omemo_states[account]
         to_jid = contact.jid
         my_jid = gajim.get_jid_from_account(account)
-        missing_keys = state.find_missing_sessions(to_jid)
-        for k in missing_keys:
-            self._query_prekey(state, to_jid, k)
+        for device_id in state.find_missing_sessions(to_jid):
+            self.fetch_device_bundle_information(state, to_jid, device_id)
 
-        for k in state.find_own_missing_sessions(my_jid):
-            self._query_prekey(state, my_jid, k)
+        for device_id in state.find_own_missing_sessions(my_jid):
+            self.fetch_device_bundle_information(state, my_jid, device_id)
 
     @log_calls('OmemoPlugin')
-    def _query_prekey(self, state, jid, key):
-        log.debug('Query prekey bundles ⇒ ' + str(key) + 'for: ' + jid)
-        iq = BundleInformationQuery(jid, key)
+    def fetch_device_bundle_information(self, state, jid, device_id):
+        """ Fetch bundle information for specified jid, key, and create axolotl
+            session on success.
+
+            Parameters
+            ----------
+            state : (OmemoState)
+                The OmemoState which is missing device bundle information
+            jid : str
+                The jid to query for bundle information
+            device_id : int
+                The device_id for which we are missing an axolotl session
+        """
+        log.debug(state.name + '→ Fetch bundle information for dev ' + str(
+            device_id) + ' and jid ' + jid)
+        iq = BundleInformationQuery(jid, device_id)
         iq_id = str(iq.getAttr('id'))
         iq_ids_to_callbacks[iq_id] = \
             lambda stanza: self.session_from_prekey_bundle(state, stanza,
-                                                           jid, key)
+                                                           jid, device_id)
         gajim.connections[state.name].connection.send(iq)
 
     @log_calls('OmemoPlugin')
