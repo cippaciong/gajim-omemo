@@ -78,3 +78,6 @@ class Ui(object):
             self.checkbox.hide()
             self.prekey_button.set_no_show_all(True)
             self.prekey_button.hide()
+
+    def activate_omemo(self):
+        self.checkbox.set_active(True)

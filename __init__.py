@@ -108,6 +108,11 @@ class OmemoPlugin(GajimPlugin):
             msg.msgtxt = msgtext
             msg.stanza.setBody(msg.msgtxt)
             log.debug(msg.conn.name + ' → ' + msg.msgtxt)
+            account = msg.conn.name
+            contact_jid = gajim.get_jid_without_resource(msg.fjid)
+            if account in self.ui_list and \
+                    contact_jid in self.ui_list[account]:
+                self.ui_list[account][contact_jid].activate_omemo()
             return False
 
     @log_calls('OmemoPlugin')
@@ -116,7 +121,8 @@ class OmemoPlugin(GajimPlugin):
         state = self.omemo_states[account]
         log.debug(account + ' ⇒ OMEMO msg received')
         result = unpack_message(msg.stanza)
-        result['sender_jid'] = gajim.get_jid_without_resource(msg.fjid)
+        from_jid = str(msg.stanza.getAttr('from'))
+        result['sender_jid'] = gajim.get_jid_without_resource(from_jid)
         plaintext = state.decrypt_msg(result)
         return plaintext
 
@@ -154,8 +160,9 @@ class OmemoPlugin(GajimPlugin):
                     self.publish_own_devices_list(state)
             else:
                 state.add_devices(contact_jid, devices_list)
-                if account in self.ui_list and contact_jid in self.ui_list[account]:
-		    self.ui_list[account][contact_jid].toggle_omemo(True)
+                if account in self.ui_list and contact_jid in self.ui_list[
+                        account]:
+                    self.ui_list[account][contact_jid].toggle_omemo(True)
             return True
         return False
 
@@ -275,7 +282,8 @@ class OmemoPlugin(GajimPlugin):
         if to_jid not in state.omemo_enabled:
             return False
         try:
-            msg_dict = state.create_msg(gajim.get_jid_from_account(account), to_jid, plaintext)
+            msg_dict = state.create_msg(
+                gajim.get_jid_from_account(account), to_jid, plaintext)
             if not msg_dict:
                 return True
             encrypted_node = OmemoMessage(msg_dict)
