@@ -241,10 +241,10 @@ class OmemoPlugin(GajimPlugin):
 
             See also
             --------
-            Example 4.3. Announcing bundle information:
+            4.3. Announcing bundle information:
                 http://conversations.im/xeps/multi-end.html#usecases-announcing
 
-            Example 4.4 Building a session:
+            4.4 Building a session:
                 http://conversations.im/xeps/multi-end.html#usecases-building
 
             Parameters:
@@ -267,7 +267,16 @@ class OmemoPlugin(GajimPlugin):
         if state.build_session(recipient_id, device_id, bundle_dict):
             self.update_prekeys(state.name, recipient_id)
 
+    @log_calls('OmemoPlugin')
     def update_prekeys(self, account, recipient_id):
+        """ Updates the "Get Prekeys" Button in the ui.
+            Parameters:
+            ----------
+            account : str
+                The account name
+            recipient_id : str
+                The recipient jid
+        """
         if account in self.ui_list:
             if recipient_id in self.ui_list[account]:
                 self.ui_list[account][recipient_id].update_prekeys()
