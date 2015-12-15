@@ -25,13 +25,9 @@ from plugins.helpers import log_calls
 from .iq import (BundleInformationAnnouncement, BundleInformationQuery,
                  DeviceListAnnouncement, OmemoMessage, successful,
                  unpack_device_bundle, unpack_device_list_update,
-                 unpack_message)
+                 unpack_message, NS_NOTIFY, NS_OMEMO)
 from .state import OmemoState
 from .ui import Ui
-
-NS_OMEMO = 'eu.siacs.conversations.axolotl'
-NS_DEVICE_LIST = NS_OMEMO + '.devicelist'
-NS_NOTIFY = NS_DEVICE_LIST + '+notify'
 
 iq_ids_to_callbacks = {}
 
