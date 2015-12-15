@@ -14,17 +14,14 @@ class PreKeyButton(gtk.Button):
         self.plugin = plugin
         self.contact = contact
         self.connect('clicked', self.on_click)
-        self.set_no_show_all(True)
-        self.hide()
+        self.refresh()
 
     def refresh(self):
         amount = self.plugin.are_keys_missing(self.contact)
         if amount == 0:
-            self.hide()
             self.set_no_show_all(True)
             self.hide()
         else:
-            self.show()
             self.set_no_show_all(False)
             self.show()
         self.set_label('Missing Prekeys ' + str(amount))
