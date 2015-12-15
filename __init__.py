@@ -99,7 +99,7 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
-        if msg.stanza.getTag('event') and self._device_list_update(msg):
+        if msg.stanza.getTag('event') and self.handle_device_list_update(msg):
             return
         elif msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
             account = msg.conn.name
@@ -127,17 +127,34 @@ class OmemoPlugin(GajimPlugin):
             return False
 
     @log_calls('OmemoPlugin')
-    def _device_list_update(self, msg):
-        account = msg.conn.name
-        contact_jid = gajim.get_jid_without_resource(msg.fjid)
-        devices_list = unpack_device_list_update(msg)
+    def handle_device_list_update(self, event):
+        """ Check if the passed event is a device list update and store the new
+            device ids.
+
+            Parameters
+            ----------
+            event : MessageReceivedEvent
+
+            Returns
+            -------
+            bool
+                True if the given event was a valid device list update event
+
+
+            See also
+            --------
+            4.2 Discovering peer support
+                http://conversations.im/xeps/multi-end.html#usecases-discovering
+        """
+        devices_list = unpack_device_list_update(event)
+        if len(devices_list) == 0:
+            return False
+        account = event.conn.name
+        contact_jid = gajim.get_jid_without_resource(event.fjid)
         state = self.omemo_states[account]
         my_jid = gajim.get_jid_from_account(account)
 
         log.debug(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
-
-        if len(devices_list) == 0:
-            return False
 
         if contact_jid == my_jid:
             log.debug(state.name + ' ⇒ Received own device_list ' + str(
