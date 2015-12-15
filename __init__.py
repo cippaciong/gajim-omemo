@@ -66,7 +66,7 @@ class OmemoPlugin(GajimPlugin):
         account = show.conn.name
         if show.show != 'offline' and account not in self.published_bundles:
             state = self.omemo_states[account]
-            self.publish_bundle(state)
+            self.announce_support(state)
             self.published_bundles[account] = True
         elif show.show == 'offline':
             self.published_bundles.pop(account, None)
@@ -273,17 +273,44 @@ class OmemoPlugin(GajimPlugin):
                 self.ui_list[account][recipient_id].update_prekeys()
 
     @log_calls('OmemoPlugin')
-    def publish_bundle(self, account):
+    def announce_support(self, account):
+        """ Announce OMEMO support for an account via PEP.
+
+            In order for other clients/devices to be able to initiate a session
+            with gajim, it first has to announce itself by adding its device ID
+            to the devicelist PEP node.
+
+            Parameters
+            ----------
+            account : str
+                The account name
+
+            See also
+            --------
+            4.3 Announcing bundle information:
+                http://conversations.im/xeps/multi-end.html#usecases-announcing
+        """
         state = self.omemo_states[account.name]
         iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
-        log.debug(account.name + " → PUBLISHING BUNDLE ")
+        log.debug(account.name + " → Announcing OMEMO support via PEP")
         iq_ids_to_callbacks[id_] = lambda stanza: \
-            self.publish_bundle_result(stanza, state)
+            self.handle_announcement_result(stanza, state)
 
     @log_calls('OmemoPlugin')
-    def publish_bundle_result(self, stanza, state):
+    def handle_announcement_result(self, stanza, state):
+        """ Updates own device list if announcement was successfull.
+
+            If the OMEMO support announcement was successfull update own device
+            list if needed.
+
+            Parameters
+            ----------
+            stanza
+                The stanza object received from callback
+        """
+
         account = state.name
         state = self.omemo_states[account]
         if successful(stanza):
