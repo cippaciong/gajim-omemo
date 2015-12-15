@@ -176,7 +176,6 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def connect_ui(self, chat_control):
-        log.info("DRIN")
         account = chat_control.contact.account.name
         jid = chat_control.contact.jid
         if account not in self.ui_list:
@@ -223,22 +222,50 @@ class OmemoPlugin(GajimPlugin):
         iq = BundleInformationQuery(jid, key)
         iq_id = str(iq.getAttr('id'))
         iq_ids_to_callbacks[iq_id] = \
-            lambda stanza: self.session_from_prekey_bundle(state,
-                                                           stanza,
-                                                           jid,
-                                                           key)
+            lambda stanza: self.session_from_prekey_bundle(state, stanza,
+                                                           jid, key)
         gajim.connections[state.name].connection.send(iq)
 
     @log_calls('OmemoPlugin')
     def session_from_prekey_bundle(self, state, stanza, recipient_id,
                                    device_id):
+        """ Starts a session when a bundle information announcement is received.
+
+
+            This method tries to build an axolotl session when a PreKey bundle
+            is fetched. If building the axolotl session is successful it tries
+            to update the ui by calling `self.update_prekeys()`.
+
+            If a session can not be build it will fail silently but log the a
+            warning.
+
+            See also
+            --------
+            Example 4.3. Announcing bundle information:
+                http://conversations.im/xeps/multi-end.html#usecases-announcing
+
+            Example 4.4 Building a session:
+                http://conversations.im/xeps/multi-end.html#usecases-building
+
+            Parameters:
+            -----------
+            state : (OmemoState)
+                The OmemoState used
+            stanza
+                The stanza object received from callback
+            recipient_id : str
+                           The recipient jid
+            device_id : int
+                The device_id for which the bundle was queried
+
+        """
         bundle_dict = unpack_device_bundle(stanza, device_id)
         if not bundle_dict:
             log.warn('Failed requesting a bundle')
             return
 
-        state.build_session(recipient_id, device_id, bundle_dict)
-        self.update_prekeys(state.name, recipient_id)
+        if state.build_session(recipient_id, device_id, bundle_dict):
+            self.update_prekeys(state.name, recipient_id)
 
     def update_prekeys(self, account, recipient_id):
         if account in self.ui_list:
