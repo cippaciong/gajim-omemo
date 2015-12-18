@@ -26,4 +26,4 @@ patch -p1 -i /path/to/gajim_fix_pep_messages.patch
 ### Running
 To see OMEMO related debug output start gajim with the parameter ```-l plugin_system.omemo=DEBUG```.
 
-Enable *OMEMO Mult-End Message and Object Encryption* in the Plugin-Manager. Before exchanging encrypted messages with a contact you have to hit the *Get Missiing Prekeys* button. (Repeat that if you or your contact get new devices.)
+Enable *OMEMO Multi-End Message and Object Encryption* in the Plugin-Manager. Before exchanging encrypted messages with a contact you have to hit the *Get Missing Prekeys* button. (Repeat that if you or your contact get new devices.)
