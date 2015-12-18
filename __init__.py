@@ -54,14 +54,18 @@ class OmemoPlugin(GajimPlugin):
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
                                      (self.connect_ui, None)}
-        for account in gajim.contacts.get_accounts():
+
+    @log_calls('OmemoPlugin')
+    def get_omemo_state(self, account):
+        if account not in self.omemo_states:
             self.omemo_states[account] = OmemoState(account)
+        return self.omemo_states[account]
 
     @log_calls('OmemoPlugin')
     def handle_show(self, show):
         account = show.conn.name
         if show.show != 'offline' and account not in self.published_bundles:
-            state = self.omemo_states[account]
+            state = self.get_omemo_state(account)
             self.announce_support(state)
             self.published_bundles[account] = True
         elif show.show == 'offline':
@@ -101,7 +105,7 @@ class OmemoPlugin(GajimPlugin):
             account = msg.conn.name
             log.debug(account + ' ⇒ OMEMO msg received')
 
-            state = self.omemo_states[account]
+            state = self.get_omemo_state(account)
             if msg.forwarded and msg.sent:
                 from_jid = str(msg.stanza.getAttr('to')) #why gajim? why?
                 log.debug('message was forwarded doing magic')
@@ -158,7 +162,7 @@ class OmemoPlugin(GajimPlugin):
             return False
         account = event.conn.name
         contact_jid = gajim.get_jid_without_resource(event.fjid)
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         my_jid = gajim.get_jid_from_account(account)
 
         log.debug(account + ' ⇒ Received OMEMO pep for jid ' + contact_jid)
@@ -210,7 +214,7 @@ class OmemoPlugin(GajimPlugin):
         """ Used by the ui to set the state of the PreKeyButton. """
         account = contact.account.name
         my_jid = gajim.get_jid_from_account(account)
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         result = 0
         result += len(state.devices_without_sessions(str(contact.jid)))
         result += len(state.own_devices_without_sessions(my_jid))
@@ -231,7 +235,7 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def query_prekey(self, contact):
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         to_jid = contact.jid
         my_jid = gajim.get_jid_from_account(account)
         for device_id in state.devices_without_sessions(to_jid):
@@ -336,7 +340,7 @@ class OmemoPlugin(GajimPlugin):
             4.3 Announcing bundle information:
                 http://conversations.im/xeps/multi-end.html#usecases-announcing
         """
-        state = self.omemo_states[account.name]
+        state = self.get_omemo_state(account.name)
         iq = BundleInformationAnnouncement(state.bundle, state.own_device_id)
         gajim.connections[state.name].connection.send(iq)
         id_ = str(iq.getAttr("id"))
@@ -358,7 +362,7 @@ class OmemoPlugin(GajimPlugin):
         """
 
         account = state.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         if successful(stanza):
             log.debug(account + ' → Publishing bundle was successful')
             if not state.own_device_id_published():
@@ -372,7 +376,7 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def clear_device_list(self, contact):
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         devices_list = [state.own_device_id]
 
         log.info(state.name + ' ⇒ Clearing devices_list ' + str(devices_list))
@@ -387,7 +391,7 @@ class OmemoPlugin(GajimPlugin):
             return
         plaintext = event.msg_iq.getBody().encode('utf8')
         account = event.conn.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         full_jid = str(event.msg_iq.getAttr('to'))
         to_jid = gajim.get_jid_without_resource(full_jid)
         if to_jid not in state.omemo_enabled:
@@ -407,21 +411,21 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def is_omemo_enabled(self, contact):
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         return contact.jid in state.omemo_enabled
 
     @log_calls('OmemoPlugin')
     def omemo_enable_for(self, contact):
         """ Used by the ui to enable omemo for a specified contact """
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         state.omemo_enabled |= {contact.jid}
 
     @log_calls('OmemoPlugin')
     def omemo_disable_for(self, contact):
         """ Used by the ui to disable omemo for a specified contact """
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         state.omemo_enabled.remove(contact.jid)
 
     @log_calls('OmemoPlugin')
@@ -435,7 +439,7 @@ class OmemoPlugin(GajimPlugin):
                 True if there are known device_ids/clients supporting OMEMO
         """
         account = contact.account.name
-        state = self.omemo_states[account]
+        state = self.get_omemo_state(account)
         if state.device_ids_for(contact):
             return True
         return False
