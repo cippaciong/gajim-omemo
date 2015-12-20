@@ -38,8 +38,6 @@ class OmemoPlugin(GajimPlugin):
 
     omemo_states = {}
 
-    published_bundles = {}
-
     ui_list = {}
 
     @log_calls('OmemoPlugin')
@@ -47,7 +45,7 @@ class OmemoPlugin(GajimPlugin):
         self.events_handlers = {
             'message-received': (ged.PRECORE, self.message_received),
             'raw-iq-received': (ged.PRECORE, self.handle_iq_received),
-            'our-show': (ged.PRECORE, self.handle_show),
+            'signed-in': (ged.PRECORE, self.signed_in),
             'stanza-message-outgoing':
             (ged.PRECORE, self.handle_outgoing_msgs),
         }
@@ -62,14 +60,10 @@ class OmemoPlugin(GajimPlugin):
         return self.omemo_states[account]
 
     @log_calls('OmemoPlugin')
-    def handle_show(self, show):
+    def signed_in(self, show):
         account = show.conn.name
-        if show.show != 'offline' and account not in self.published_bundles:
-            state = self.get_omemo_state(account)
-            self.announce_support(state)
-            self.published_bundles[account] = True
-        elif show.show == 'offline':
-            self.published_bundles.pop(account, None)
+        state = self.get_omemo_state(account)
+        self.announce_support(state)
 
     @log_calls('OmemoPlugin')
     def activate(self):
