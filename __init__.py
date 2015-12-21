@@ -95,15 +95,13 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
-        if msg.stanza.getTag('event') and self.handle_device_list_update(msg):
-            return
-        elif msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
+        if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
             account = msg.conn.name
             log.debug(account + ' ⇒ OMEMO msg received')
 
             state = self.get_omemo_state(account)
             if msg.forwarded and msg.sent:
-                from_jid = str(msg.stanza.getAttr('to')) #why gajim? why?
+                from_jid = str(msg.stanza.getAttr('to'))  # why gajim? why?
                 log.debug('message was forwarded doing magic')
             else:
                 from_jid = str(msg.stanza.getAttr('from'))

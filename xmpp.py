@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Gajim.  If not, see <http://www.gnu.org/licenses/>.
 #
-
 """ This module handles all the XMPP logic like creating different kind of
 stanza nodes and geting data from stanzas.
 """
