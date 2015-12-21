@@ -28,6 +28,7 @@ from nbxmpp.protocol import NS_PUBSUB, Iq
 from nbxmpp.simplexml import Node
 
 from common import gajim
+from common.pep import AbstractPEP
 from plugins.helpers import log_calls
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
@@ -119,6 +120,15 @@ class BundleInformationAnnouncement(Iq):
             prekeys.addChild('preKeyPublic',
                              attrs={'preKeyId': key[0]}).addData(key[1])
         return result
+
+
+class DevicelistPEP(AbstractPEP):
+    type_ = 'headline'
+    namespace = NS_DEVICE_LIST
+
+    def _extract_info(self, items):
+        log.info('GOT PEP!')
+        return ({}, [])
 
 
 @log_calls('OmemoPlugin')

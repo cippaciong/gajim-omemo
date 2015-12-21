@@ -19,15 +19,16 @@
 import logging
 
 from common import caps_cache, gajim, ged
+from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
 from .state import OmemoState
 from .ui import Ui
-from .xmpp import (NS_NOTIFY, NS_OMEMO, BundleInformationAnnouncement,
-                   BundleInformationQuery, DeviceListAnnouncement,
-                   OmemoMessage, successful, unpack_device_bundle,
-                   unpack_device_list_update, unpack_message)
+from .xmpp import (
+    NS_NOTIFY, NS_OMEMO, BundleInformationAnnouncement, BundleInformationQuery,
+    DeviceListAnnouncement, DevicelistPEP, OmemoMessage, successful,
+    unpack_device_bundle, unpack_device_list_update, unpack_message)
 
 iq_ids_to_callbacks = {}
 
@@ -52,6 +53,7 @@ class OmemoPlugin(GajimPlugin):
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
                                      (self.connect_ui, None)}
+        SUPPORTED_PERSONAL_USER_EVENTS.append(DevicelistPEP)
 
     @log_calls('OmemoPlugin')
     def get_omemo_state(self, account):
