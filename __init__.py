@@ -19,15 +19,16 @@
 import logging
 
 from common import caps_cache, gajim, ged
+from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
 
 from .state import OmemoState
 from .ui import Ui
-from .xmpp import (NS_NOTIFY, NS_OMEMO, BundleInformationAnnouncement,
-                   BundleInformationQuery, DeviceListAnnouncement,
-                   OmemoMessage, successful, unpack_device_bundle,
-                   unpack_device_list_update, unpack_message)
+from .xmpp import (
+    NS_NOTIFY, NS_OMEMO, BundleInformationAnnouncement, BundleInformationQuery,
+    DeviceListAnnouncement, DevicelistPEP, OmemoMessage, successful,
+    unpack_device_bundle, unpack_device_list_update, unpack_message)
 
 iq_ids_to_callbacks = {}
 
@@ -44,6 +45,7 @@ class OmemoPlugin(GajimPlugin):
     def init(self):
         self.events_handlers = {
             'message-received': (ged.PRECORE, self.message_received),
+            'pep-received': (ged.PRECORE, self.handle_device_list_update),
             'raw-iq-received': (ged.PRECORE, self.handle_iq_received),
             'signed-in': (ged.PRECORE, self.signed_in),
             'stanza-message-outgoing':
@@ -52,6 +54,7 @@ class OmemoPlugin(GajimPlugin):
         self.config_dialog = None
         self.gui_extension_points = {'chat_control_base':
                                      (self.connect_ui, None)}
+        SUPPORTED_PERSONAL_USER_EVENTS.append(DevicelistPEP)
 
     @log_calls('OmemoPlugin')
     def get_omemo_state(self, account):
@@ -93,15 +96,13 @@ class OmemoPlugin(GajimPlugin):
 
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
-        if msg.stanza.getTag('event') and self.handle_device_list_update(msg):
-            return
-        elif msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
+        if msg.stanza.getTag('encrypted', namespace=NS_OMEMO):
             account = msg.conn.name
             log.debug(account + ' ⇒ OMEMO msg received')
 
             state = self.get_omemo_state(account)
             if msg.forwarded and msg.sent:
-                from_jid = str(msg.stanza.getAttr('to')) #why gajim? why?
+                from_jid = str(msg.stanza.getAttr('to'))  # why gajim? why?
                 log.debug('message was forwarded doing magic')
             else:
                 from_jid = str(msg.stanza.getAttr('from'))
@@ -151,6 +152,9 @@ class OmemoPlugin(GajimPlugin):
             4.2 Discovering peer support
                 http://conversations.im/xeps/multi-end.html#usecases-discovering
         """
+        if event.pep_type != 'headline':
+            return False
+
         devices_list = unpack_device_list_update(event)
         if len(devices_list) == 0:
             return False

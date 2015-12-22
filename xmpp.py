@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Gajim.  If not, see <http://www.gnu.org/licenses/>.
 #
-
 """ This module handles all the XMPP logic like creating different kind of
 stanza nodes and geting data from stanzas.
 """
@@ -28,6 +27,7 @@ from nbxmpp.protocol import NS_PUBSUB, Iq
 from nbxmpp.simplexml import Node
 
 from common import gajim
+from common.pep import AbstractPEP
 from plugins.helpers import log_calls
 
 NS_OMEMO = 'eu.siacs.conversations.axolotl'
@@ -119,6 +119,14 @@ class BundleInformationAnnouncement(Iq):
             prekeys.addChild('preKeyPublic',
                              attrs={'preKeyId': key[0]}).addData(key[1])
         return result
+
+
+class DevicelistPEP(AbstractPEP):
+    type_ = 'headline'
+    namespace = NS_DEVICE_LIST
+
+    def _extract_info(self, items):
+        return ({}, [])
 
 
 @log_calls('OmemoPlugin')
@@ -258,8 +266,7 @@ def unpack_encrypted(encrypted_node):
         keys[int(rid)] = decode_data(kn)
 
     result = {'sid': sid, 'iv': iv, 'keys': keys, 'payload': payload}
-    log.debug('Parsed OMEMO message')
-    log.debug(result)
+    log.debug('Parsed OMEMO message:' + str(result))
     return result
 
 
