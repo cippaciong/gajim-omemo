@@ -16,13 +16,6 @@ cd ~/.local/share/gajim/plugins
 git clone git@github.com:kalkin/gajim-omemo.git
 ````
 
-### Patching Gajim
-There is a bug in gajim that prevents plugins from receiving PEP messages. Until this bug is fixed upstream this plugin provides a patch file in ```gajim_fix_pep_messages.patch``` that can be applied as follows
-````
-cd /path/to/gajim
-patch -p1 -i /path/to/gajim_fix_pep_messages.patch
-````
-
 ### Running
 To see OMEMO related debug output start gajim with the parameter ```-l plugin_system.omemo=DEBUG```.
 
