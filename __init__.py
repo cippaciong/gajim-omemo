@@ -45,6 +45,7 @@ class OmemoPlugin(GajimPlugin):
     def init(self):
         self.events_handlers = {
             'message-received': (ged.PRECORE, self.message_received),
+            'pep-received': (ged.PRECORE, self.handle_device_list_update),
             'raw-iq-received': (ged.PRECORE, self.handle_iq_received),
             'signed-in': (ged.PRECORE, self.signed_in),
             'stanza-message-outgoing':
@@ -151,6 +152,9 @@ class OmemoPlugin(GajimPlugin):
             4.2 Discovering peer support
                 http://conversations.im/xeps/multi-end.html#usecases-discovering
         """
+        if event.pep_type != 'headline':
+            return False
+
         devices_list = unpack_device_list_update(event)
         if len(devices_list) == 0:
             return False

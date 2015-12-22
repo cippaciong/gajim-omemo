@@ -126,7 +126,6 @@ class DevicelistPEP(AbstractPEP):
     namespace = NS_DEVICE_LIST
 
     def _extract_info(self, items):
-        log.info('GOT PEP!')
         return ({}, [])
 
 
@@ -267,8 +266,7 @@ def unpack_encrypted(encrypted_node):
         keys[int(rid)] = decode_data(kn)
 
     result = {'sid': sid, 'iv': iv, 'keys': keys, 'payload': payload}
-    log.debug('Parsed OMEMO message')
-    log.debug(result)
+    log.debug('Parsed OMEMO message:' + str(result))
     return result
 
 
