@@ -12,11 +12,13 @@ want to use `pip2` as Gajim is using python2.7)
 * python-axolotl
 
 ## Installation
-Clone the git repository into Gajims plugin directory.
-````
+Clone the git repository into Gajim's plugin directory.
+
+```shell
+mkdir ~/.local/share/gajim/plugins -p
 cd ~/.local/share/gajim/plugins
 git clone git@github.com:kalkin/gajim-omemo.git
-````
+```
 
 ## Running
 To see OMEMO related debug output start gajim with the parameter `-l
