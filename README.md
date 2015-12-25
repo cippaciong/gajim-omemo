@@ -32,4 +32,19 @@ device keys.  It uses trust on first use. This will be added in near future.
 To see OMEMO related debug output start Gajim with the parameter `-l
 gajim.plugin_system.omemo=DEBUG`.
 
+## Support this project
+I develop this project in my free time. Your donation allows me to spend more
+time working on it and on free software generally.
 
+My Bitcoin Address is: `1CnNM3Mree9hU8eRjCXrfCWV mX6oBnEfV1`
+
+
+## I found a bug
+Please report it to the [issue
+tracker](https://github.com/kalkin/gajim-omemo/issues). If you are experiencing
+misbehaviour please provide detailed steps to reproduce and debugging output.
+Always mention the exact Gajim version. 
+
+## Contact
+You can contact me via email at `bahtiar@gadimov.de` or follow me on
+[Twitter](https://twitter.com/_kalkin)
