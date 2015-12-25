@@ -21,9 +21,15 @@ git clone git@github.com:kalkin/gajim-omemo.git
 ```
 
 ## Running
-To see OMEMO related debug output start gajim with the parameter `-l
-plugin_system.omemo=DEBUG`.
-
 Enable *OMEMO Multi-End Message and Object Encryption* in the Plugin-Manager.
 Before exchanging encrypted messages with a contact you have to hit the *Get
-Missing Prekeys* button. (Repeat that if you or your contact get new devices.)
+Device Keys* button. (Repeat that if you or your contact get new devices.)
+
+Currently the plugin has no user interface for confirming the own and foreign
+device keys.  It uses trust on first use. This will be added in near future.
+
+## Debugging
+To see OMEMO related debug output start Gajim with the parameter `-l
+gajim.plugin_system.omemo=DEBUG`.
+
+
