@@ -10,7 +10,7 @@ log = logging.getLogger('gajim.plugin_system.omemo')
 
 class PreKeyButton(gtk.Button):
     def __init__(self, plugin, contact):
-        super(PreKeyButton, self).__init__(label='Get Missing Prekeys ' + str(
+        super(PreKeyButton, self).__init__(label='Get Device Keys' + str(
             plugin.are_keys_missing(contact)))
         self.plugin = plugin
         self.contact = contact
@@ -25,7 +25,7 @@ class PreKeyButton(gtk.Button):
         else:
             self.set_no_show_all(False)
             self.show()
-        self.set_label('Missing Prekeys ' + str(amount))
+        self.set_label('Get Device Keys ' + str(amount))
 
     def on_click(self, widget):
         self.plugin.query_prekey(self.contact)
