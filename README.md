@@ -1,7 +1,9 @@
 # OMEMO Plugin for Gajim
 
-Experimental plugin that adds support for the [OMEMO
-Encryption](http://conversations.im/omemo) to [Gajim](https://gajim.org/).
+This is an experimental plugin that adds support for the [OMEMO
+Encryption](http://conversations.im/omemo) to [Gajim](https://gajim.org/). This
+plugin is [free software](http://www.gnu.org/philosophy/free-sw.en.html)
+distributed under the GNU General Public License version 3 or any later version.
 
 **DO NOT rely on this plugin to protect sensitive information!** 
 
