@@ -381,7 +381,10 @@ class OmemoPlugin(GajimPlugin):
 
         log.info(state.name + ' ⇒ Clearing devices_list ' + str(devices_list))
         iq = DeviceListAnnouncement(devices_list)
-        gajim.connections[state.name].connection.send(iq)
+        connection = gajim.connections[state.name].connection
+        if not connection:  # not connected
+            return
+        connection.send(iq)
         id_ = str(iq.getAttr('id'))
         iq_ids_to_callbacks[id_] = lambda event: log.info(event)
 
