@@ -130,7 +130,7 @@ class OmemoPlugin(GajimPlugin):
             account = msg.conn.name
             from_jid = str(msg.stanza.getAttr('from'))
             jid = gajim.get_jid_without_resource(from_jid)
-            gui = self.ui_list[account][jid]
+            gui = self.ui_list[account].get(jid, None)
             if gui and gui.encryption_active():
                 gui.plain_warning()
 
