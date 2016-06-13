@@ -22,6 +22,10 @@ from axolotl.identitykey import IdentityKey
 from axolotl.identitykeypair import IdentityKeyPair
 from axolotl.state.identitykeystore import IdentityKeyStore
 
+UNDECIDED = 2
+TRUSTED = 1
+UNTRUSTED = 0
+
 
 class LiteIdentityKeyStore(IdentityKeyStore):
     def __init__(self, dbConn):
@@ -67,10 +71,88 @@ class LiteIdentityKeyStore(IdentityKeyStore):
         self.dbConn.commit()
 
     def saveIdentity(self, recipientId, identityKey):
-        q = "INSERT INTO identities (recipient_id, public_key) VALUES(?, ?)"
+        q = "INSERT INTO identities (recipient_id, public_key, trust) " \
+            "VALUES(?, ?, ?)"
         c = self.dbConn.cursor()
+
+        if not self.getIdentity(recipientId, identityKey):
+            c.execute(q, (recipientId,
+                          identityKey.getPublicKey().serialize(),
+                          UNDECIDED))
+            self.dbConn.commit()
+
+    def getIdentity(self, recipientId, identityKey):
+        q = "SELECT * FROM identities WHERE recipient_id = ? " \
+            "AND public_key = ?"
+        c = self.dbConn.cursor()
+
         c.execute(q, (recipientId, identityKey.getPublicKey().serialize()))
-        self.dbConn.commit()
+        result = c.fetchone()
+
+        return result is not None
 
     def isTrustedIdentity(self, recipientId, identityKey):
         return True
+
+    def getAllFingerprints(self):
+        q = "SELECT _id, recipient_id, public_key, trust FROM identities " \
+            "WHERE recipient_id != -1 ORDER BY recipient_id ASC"
+        c = self.dbConn.cursor()
+
+        result = []
+        for row in c.execute(q):
+            result.append((row[0], row[1], row[2], row[3]))
+        return result
+
+    def getFingerprints(self, jid):
+        q = "SELECT _id, recipient_id, public_key, trust FROM identities " \
+            "WHERE recipient_id =? ORDER BY trust ASC"
+        c = self.dbConn.cursor()
+
+        result = []
+        c.execute(q, (jid,))
+        rows = c.fetchall()
+        for row in rows:
+            result.append((row[0], row[1], row[2], row[3]))
+        return result
+
+    def getTrustedFingerprints(self, jid):
+        q = "SELECT _id FROM identities WHERE recipient_id = ? AND trust = ?"
+        c = self.dbConn.cursor()
+
+        result = []
+        c.execute(q, (jid, TRUSTED))
+        result = c.fetchall()
+
+        return result
+
+    def getUndecidedFingerprints(self, jid):
+        q = "SELECT trust FROM identities WHERE recipient_id = ? AND trust = ?"
+        c = self.dbConn.cursor()
+
+        result = []
+        c.execute(q, (jid, UNDECIDED))
+        result = c.fetchall()
+
+        return result
+
+    def setTrust(self, _id, trust):
+        q = "UPDATE identities SET trust = ? WHERE _id = ?"
+        c = self.dbConn.cursor()
+        c.execute(q, (trust, _id))
+        self.dbConn.commit()
+
+    def getTrust(self, recipientId, identityKey):
+        q = "SELECT trust FROM identities WHERE recipient_id = ? " \
+            "AND public_key = ?"
+        c = self.dbConn.cursor()
+
+        c.execute(q, (recipientId, identityKey.getPublicKey().serialize()))
+        result = c.fetchone()
+
+        states = [UNTRUSTED, TRUSTED, UNDECIDED]
+
+        if result[0] in states:
+            return result[0]
+        else:
+            return UNDECIDED
