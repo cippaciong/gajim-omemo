@@ -38,73 +38,60 @@ UNTRUSTED = 0
 class OmemoButton(gtk.Button):
     def __init__(self, plugin, chat_control, ui, enabled):
         super(OmemoButton, self).__init__(label=None, stock=None)
-        self.plugin = plugin
-        self.ui = ui
-        self.enabled = enabled
-        self.contact = chat_control.contact
         self.chat_control = chat_control
+
         self.set_property('relief', gtk.RELIEF_NONE)
         self.set_property('can-focus', False)
         self.set_sensitive(True)
-        img = gtk.Image()
-        img.set_from_file(self.plugin.local_file_path('omemo16x16.png'))
-        self.set_image(img)
+
+        icon = gtk.image_new_from_file(plugin.local_file_path('omemo16x16.png'))
+        self.set_image(icon)
         self.set_tooltip_text('OMEMO Encryption')
 
-        self.menu = gtk.Menu()
-        item = gtk.CheckMenuItem('Activate OMEMO')
-        if self.enabled:
-            item.set_active(True)
-            self.chat_control.print_conversation_line(
-                u'OMEMO encryption enabled ', 'status', '', None)
-            self.ui.refreshAuthLockSymbol()
-        else:
-            item.set_active(False)
-            self.chat_control.print_conversation_line(
-                u'OMEMO encryption disabled', 'status', '', None)
-            self.ui.refreshAuthLockSymbol()
-        item.connect('activate', self.activate_omemo)
-        self.menu.append(item)
+        self.connect('clicked', self.on_click)
+
+        self.menu = OmemoMenu(ui, enabled)
+
+    def on_click(self, widget):
+        """
+        Popup omemo menu
+        """
+        gtkgui_helpers.popup_emoticons_under_button(
+            self.menu, widget, self.chat_control.parent_win)
+
+    def set_omemo_state(self, state):
+        self.menu.set_omemo_state(state)
+
+
+class OmemoMenu(gtk.Menu):
+    def __init__(self, ui, enabled):
+        super(OmemoMenu, self).__init__()
+        self.ui = ui
+
+        self.item_omemo_state = gtk.CheckMenuItem('Activate OMEMO')
+        self.item_omemo_state.set_active(enabled)
+        self.item_omemo_state.connect('activate', self.on_toggle_omemo)
+        self.append(self.item_omemo_state)
 
         item = gtk.ImageMenuItem('Fingerprints')
         icon = gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
                                         gtk.ICON_SIZE_MENU)
         item.set_image(icon)
-        item.connect('activate', self.open_fingerprint_window)
-        self.menu.append(item)
+        item.connect('activate', self.on_open_fingerprint_window)
+        self.append(item)
 
-        self.menu.show_all()
+        self.show_all()
 
-        self.connect('clicked', self.on_click, self.menu)
+    def on_toggle_omemo(self, widget):
+        self.ui.set_omemo_state(widget.get_active())
 
-    def on_click(self, widget, menu):
-        """
-        Popup omemo menu
-        """
-        gtkgui_helpers.popup_emoticons_under_button(
-            menu, widget, self.chat_control.parent_win)
+    def on_open_fingerprint_window(self, widget):
+        self.ui.show_fingerprint_window()
 
-    def activate_omemo(self, widget):
-        enabled = widget.get_active()
-        if enabled:
-            log.debug(self.contact.account.name + ' => Enable OMEMO for ' +
-                      self.contact.jid)
-            self.plugin.omemo_enable_for(self.contact)
-            self.chat_control.print_conversation_line(
-                u'OMEMO encryption enabled ', 'status', '', None)
-            self.ui.WarnIfUndecidedFingerprints()
-        else:
-            log.debug(self.contact.account.name + ' => Disable OMEMO for ' +
-                      self.contact.jid)
-            self.plugin.omemo_disable_for(self.contact)
-            self.ui.refreshAuthLockSymbol()
-            self.chat_control.print_conversation_line(
-                u'OMEMO encryption disabled', 'status', '', None)
-
-    def open_fingerprint_window(self, widget):
-        dlg = FingerprintWindow(self.plugin, self.contact,
-                                self.chat_control.parent_win.window)
-        dlg.show_all()
+    def set_omemo_state(self, state):
+        self.item_omemo_state.handler_block_by_func(self.on_toggle_omemo)
+        self.item_omemo_state.set_active(state)
+        self.item_omemo_state.handler_unblock_by_func(self.on_toggle_omemo)
 
 
 def _add_widget(widget, chat_control):
@@ -120,22 +107,73 @@ class Ui(object):
     def __init__(self, plugin, chat_control, enabled, state):
         self.contact = chat_control.contact
         self.chat_control = chat_control
+        self.plugin = plugin
         self.state = state
+
+        self.display_omemo_state()
+        self.refreshAuthLockSymbol()
+
         self.omemobutton = OmemoButton(plugin, chat_control, self, enabled)
 
         _add_widget(self.omemobutton, self.chat_control)
+
+        # add a OMEMO entry to the context/advanced menu
+        chat_control.omemo_orig_prepare_context_menu = chat_control.prepare_context_menu
+        def omemo_prepare_context_menu(hide_buttonbar_items=False):
+            menu = chat_control.omemo_orig_prepare_context_menu(hide_buttonbar_items)
+            submenu = OmemoMenu(self, self.encryption_active())
+
+            item = gtk.ImageMenuItem('OMEMO Encryption')
+            icon_path = plugin.local_file_path('omemo16x16.png')
+            item.set_image(gtk.image_new_from_file(icon_path))
+            item.set_submenu(submenu)
+
+            # at index 8 is the separator after the esession encryption entry
+            menu.insert(item, 8)
+            return menu
+        chat_control.prepare_context_menu = omemo_prepare_context_menu
+
+    def set_omemo_state(self, enabled):
+        """
+        Enable or disable OMEMO for this window's contact and update the
+        window ui accordingly
+        """
+        if enabled:
+            log.debug(self.contact.account.name + ' => Enable OMEMO for ' +
+                      self.contact.jid)
+            self.plugin.omemo_enable_for(self.contact)
+            self.WarnIfUndecidedFingerprints() # calls refreshAuthLockSymbol()
+        else:
+            log.debug(self.contact.account.name + ' => Disable OMEMO for ' +
+                      self.contact.jid)
+            self.plugin.omemo_disable_for(self.contact)
+            self.refreshAuthLockSymbol()
+
+        self.omemobutton.set_omemo_state(enabled)
+        self.display_omemo_state()
 
     def encryption_active(self):
         return self.state.encryption.is_active(self.contact.jid)
 
     def activate_omemo(self):
-        self.omemobutton.menu.set_active(0)
-        self.omemobutton.menu.get_active().set_active(True)
+        self.omemobutton.set_omemo_state(True)
+
+    def show_fingerprint_window(self):
+        dlg = FingerprintWindow(self.plugin, self.contact,
+                                self.chat_control.parent_win.window)
+        dlg.show_all()
 
     def plain_warning(self):
         self.chat_control.print_conversation_line(
             'Received plaintext message! ' +
             'Your next message will still be encrypted!', 'status', '', None)
+
+    def display_omemo_state(self):
+        if self.encryption_active():
+            msg = u'OMEMO encryption enabled'
+        else:
+            msg = u'OMEMO encryption disabled'
+        self.chat_control.print_conversation_line(msg, 'status', '', None)
 
     def WarnIfUndecidedFingerprints(self):
         if self.state.store.identityKeyStore. \
