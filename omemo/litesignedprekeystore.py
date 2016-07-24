@@ -20,6 +20,7 @@
 from axolotl.invalidkeyidexception import InvalidKeyIdException
 from axolotl.state.signedprekeyrecord import SignedPreKeyRecord
 from axolotl.state.signedprekeystore import SignedPreKeyStore
+from axolotl.util.medium import Medium
 
 
 class LiteSignedPreKeyStore(SignedPreKeyStore):
@@ -28,10 +29,6 @@ class LiteSignedPreKeyStore(SignedPreKeyStore):
         :type dbConn: Connection
         """
         self.dbConn = dbConn
-        dbConn.execute(
-            "CREATE TABLE IF NOT EXISTS signed_prekeys (" +
-            "_id INTEGER PRIMARY" + " KEY AUTOINCREMENT," +
-            "prekey_id INTEGER UNIQUE, timestamp INTEGER, record BLOB);")
 
     def loadSignedPreKey(self, signedPreKeyId):
         q = "SELECT record FROM signed_prekeys WHERE prekey_id = ?"
@@ -74,4 +71,43 @@ class LiteSignedPreKeyStore(SignedPreKeyStore):
         q = "DELETE FROM signed_prekeys WHERE prekey_id = ?"
         cursor = self.dbConn.cursor()
         cursor.execute(q, (signedPreKeyId, ))
+        self.dbConn.commit()
+
+    def getNextSignedPreKeyId(self):
+        result = self.getCurrentSignedPreKeyId()
+        if not result:
+            return 1  # StartId if no SignedPreKeys exist
+        else:
+            return (result % (Medium.MAX_VALUE - 1)) + 1
+
+    def getCurrentSignedPreKeyId(self):
+        q = "SELECT MAX(prekey_id) FROM signed_prekeys"
+
+        cursor = self.dbConn.cursor()
+        cursor.execute(q)
+        result = cursor.fetchone()
+        if not result:
+            return None
+        else:
+            return result[0]
+
+    def getSignedPreKeyTimestamp(self, signedPreKeyId):
+        q = "SELECT strftime('%s', timestamp) FROM " \
+            "signed_prekeys WHERE prekey_id = ?"
+
+        cursor = self.dbConn.cursor()
+        cursor.execute(q, (signedPreKeyId, ))
+
+        result = cursor.fetchone()
+        if not result:
+            raise InvalidKeyIdException("No such signedprekeyrecord! %s " %
+                                        signedPreKeyId)
+
+        return result[0]
+
+    def removeOldSignedPreKeys(self, timestamp):
+        q = "DELETE FROM signed_prekeys " \
+            "WHERE timestamp < datetime(?, 'unixepoch')"
+        cursor = self.dbConn.cursor()
+        cursor.execute(q, (timestamp, ))
         self.dbConn.commit()

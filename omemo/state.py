@@ -18,6 +18,7 @@
 #
 
 import logging
+import time
 from base64 import b64encode
 
 from axolotl.ecc.djbec import DjbECPublicKey
@@ -35,9 +36,10 @@ from axolotl.util.keyhelper import KeyHelper
 from Crypto.Random import get_random_bytes
 
 from .aes_gcm import NoValidSessions, aes_decrypt, aes_encrypt
-from .liteaxolotlstore import LiteAxolotlStore
+from .liteaxolotlstore import (LiteAxolotlStore, DEFAULT_PREKEY_AMOUNT,
+                               MIN_PREKEY_AMOUNT, SPK_CYCLE_TIME,
+                               SPK_ARCHIVE_TIME)
 
-# log = logging.getLogger('omemo')
 log = logging.getLogger('gajim.plugin_system.omemo')
 
 
@@ -47,12 +49,13 @@ UNDECIDED = 2
 
 
 class OmemoState:
-    def __init__(self, own_jid, connection, account):
+    def __init__(self, own_jid, connection, account, plugin):
         """ Instantiates an OmemoState object.
 
             :param connection: an :py:class:`sqlite3.Connection`
         """
         self.account = account
+        self.plugin = plugin
         self.session_ciphers = {}
         self.own_jid = own_jid
         self.device_ids = {}
@@ -65,10 +68,13 @@ class OmemoState:
             else:
                 self.add_own_device(device_id)
 
-        log.info(self.own_jid + ': Roster devices after boot:' +
+        log.info(self.account + ' => Roster devices after boot:' +
                  str(self.device_ids))
-        log.info(self.own_jid + ': Own devices after boot:' +
+        log.info(self.account + ' => Own devices after boot:' +
                  str(self.own_devices))
+        log.debug(self.account + ' => ' +
+                  str(self.store.preKeyStore.getPreKeyCount()) +
+                  ' PreKeys available')
 
     def build_session(self, recipient_id, device_id, bundle_dict):
         sessionBuilder = SessionBuilder(self.store, self.store, self.store,
@@ -144,6 +150,7 @@ class OmemoState:
 
     @property
     def bundle(self):
+        self.checkPreKeyAmount()
         prekeys = [
             (k.getId(), b64encode(k.getKeyPair().getPublicKey().serialize()))
             for k in self.store.loadPreKeys()
@@ -151,10 +158,10 @@ class OmemoState:
 
         identityKeyPair = self.store.getIdentityKeyPair()
 
-        signedPreKey = KeyHelper.generateSignedPreKey(
-            identityKeyPair, KeyHelper.getRandomSequence(65536))
+        self.cycleSignedPreKey(identityKeyPair)
 
-        self.store.storeSignedPreKey(signedPreKey.getId(), signedPreKey)
+        signedPreKey = self.store.loadSignedPreKey(
+            self.store.getCurrentSignedPreKeyId())
 
         result = {
             'signedPreKeyId': signedPreKey.getId(),
@@ -328,6 +335,9 @@ class OmemoState:
         sessionCipher = self.get_session_cipher(recipient_id, device_id)
         if self.isTrusted(sessionCipher) != UNTRUSTED:
             key = sessionCipher.decryptPkmsg(preKeyWhisperMessage)
+            # Publish new bundle after PreKey has been used
+            # for building a new Session
+            self.plugin.publish_bundle(self.account)
             return key
         else:
             raise Exception("Received PreKeyWhisperMessage "
@@ -343,3 +353,40 @@ class OmemoState:
         else:
             raise Exception("Received WhisperMessage "
                             "from Untrusted Fingerprint!")
+
+    def checkPreKeyAmount(self):
+        # Check if enough PreKeys are available
+        preKeyCount = self.store.preKeyStore.getPreKeyCount()
+        if preKeyCount < MIN_PREKEY_AMOUNT:
+            newKeys = DEFAULT_PREKEY_AMOUNT - preKeyCount
+            self.store.preKeyStore.generateNewPreKeys(newKeys)
+            log.info(self.account + ' => ' + str(newKeys) +
+                     ' PreKeys created')
+
+    def cycleSignedPreKey(self, identityKeyPair):
+        # Publish every SPK_CYCLE_TIME a new SignedPreKey
+        # Delete all exsiting SignedPreKeys that are older
+        # then SPK_ARCHIVE_TIME
+
+        # Check if SignedPreKey exist and create if not
+        if not self.store.getCurrentSignedPreKeyId():
+            signedPreKey = KeyHelper.generateSignedPreKey(
+                identityKeyPair, self.store.getNextSignedPreKeyId())
+            self.store.storeSignedPreKey(signedPreKey.getId(), signedPreKey)
+            log.debug(self.account +
+                      ' => New SignedPreKey created, because none existed')
+
+        # if SPK_CYCLE_TIME is reached, generate a new SignedPreKey
+        now = int(time.time())
+        timestamp = self.store.getSignedPreKeyTimestamp(
+            self.store.getCurrentSignedPreKeyId())
+
+        if int(timestamp) < now - SPK_CYCLE_TIME:
+            signedPreKey = KeyHelper.generateSignedPreKey(
+                identityKeyPair, self.store.getNextSignedPreKeyId())
+            self.store.storeSignedPreKey(signedPreKey.getId(), signedPreKey)
+            log.debug(self.account + ' => Cycled SignedPreKey')
+
+        # Delete all SignedPreKeys that are older than SPK_ARCHIVE_TIME
+        timestamp = now - SPK_ARCHIVE_TIME
+        self.store.removeOldSignedPreKeys(timestamp)

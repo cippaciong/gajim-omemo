@@ -27,10 +27,14 @@ from .liteprekeystore import LitePreKeyStore
 from .litesessionstore import LiteSessionStore
 from .litesignedprekeystore import LiteSignedPreKeyStore
 from .encryption import EncryptionState
+from .sql import SQLDatabase
 
 log = logging.getLogger('gajim.plugin_system.omemo')
 
 DEFAULT_PREKEY_AMOUNT = 100
+MIN_PREKEY_AMOUNT = 80
+SPK_ARCHIVE_TIME = 8600 * 15  # 15 Days
+SPK_CYCLE_TIME = 8600         # 24 Hours
 
 
 class LiteAxolotlStore(AxolotlStore):
@@ -40,6 +44,8 @@ class LiteAxolotlStore(AxolotlStore):
         except(AttributeError):
             raise AssertionError('Expected a sqlite3.Connection got ' +
                                  str(connection))
+
+        self.sql = SQLDatabase(connection)
         self.identityKeyStore = LiteIdentityKeyStore(connection)
         self.preKeyStore = LitePreKeyStore(connection)
         self.signedPreKeyStore = LiteSignedPreKeyStore(connection)
@@ -56,6 +62,11 @@ class LiteAxolotlStore(AxolotlStore):
         preKeys = KeyHelper.generatePreKeys(KeyHelper.getRandomSequence(),
                                             DEFAULT_PREKEY_AMOUNT)
         self.storeLocalData(registrationId, identityKeyPair)
+
+        signedPreKey = KeyHelper.generateSignedPreKey(
+            identityKeyPair, KeyHelper.getRandomSequence(65536))
+
+        self.storeSignedPreKey(signedPreKey.getId(), signedPreKey)
 
         for preKey in preKeys:
             self.storePreKey(preKey.getId(), preKey)
@@ -128,3 +139,15 @@ class LiteAxolotlStore(AxolotlStore):
 
     def removeSignedPreKey(self, signedPreKeyId):
         self.signedPreKeyStore.removeSignedPreKey(signedPreKeyId)
+
+    def getNextSignedPreKeyId(self):
+        return self.signedPreKeyStore.getNextSignedPreKeyId()
+
+    def getCurrentSignedPreKeyId(self):
+        return self.signedPreKeyStore.getCurrentSignedPreKeyId()
+
+    def getSignedPreKeyTimestamp(self, signedPreKeyId):
+        return self.signedPreKeyStore.getSignedPreKeyTimestamp(signedPreKeyId)
+
+    def removeOldSignedPreKeys(self, timestamp):
+        self.signedPreKeyStore.removeOldSignedPreKeys(timestamp)

@@ -19,6 +19,7 @@
 
 from axolotl.state.prekeyrecord import PreKeyRecord
 from axolotl.state.prekeystore import PreKeyStore
+from axolotl.util.keyhelper import KeyHelper
 
 
 class LitePreKeyStore(PreKeyStore):
@@ -27,10 +28,6 @@ class LitePreKeyStore(PreKeyStore):
         :type dbConn: Connection
         """
         self.dbConn = dbConn
-        dbConn.execute("CREATE TABLE IF NOT EXISTS prekeys(" +
-                       "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                       "prekey_id INTEGER UNIQUE, sent_to_server BOOLEAN, " +
-                       " record BLOB);")
 
     def loadPreKey(self, preKeyId):
         q = "SELECT record FROM prekeys WHERE prekey_id = ?"
@@ -53,7 +50,6 @@ class LitePreKeyStore(PreKeyStore):
         return [PreKeyRecord(serialized=r[0]) for r in result]
 
     def storePreKey(self, preKeyId, preKeyRecord):
-        # self.removePreKey(preKeyId)
         q = "INSERT INTO prekeys (prekey_id, record) VALUES(?,?)"
         cursor = self.dbConn.cursor()
         cursor.execute(q, (preKeyId, preKeyRecord.serialize()))
@@ -70,3 +66,22 @@ class LitePreKeyStore(PreKeyStore):
         cursor = self.dbConn.cursor()
         cursor.execute(q, (preKeyId, ))
         self.dbConn.commit()
+
+    def getCurrentPreKeyId(self):
+        q = "SELECT MAX(prekey_id) FROM prekeys"
+        cursor = self.dbConn.cursor()
+        cursor.execute(q)
+        return cursor.fetchone()[0]
+
+    def getPreKeyCount(self):
+        q = "SELECT COUNT(prekey_id) FROM prekeys"
+        cursor = self.dbConn.cursor()
+        cursor.execute(q)
+        return cursor.fetchone()[0]
+
+    def generateNewPreKeys(self, count):
+        startId = self.getCurrentPreKeyId() + 1
+        preKeys = KeyHelper.generatePreKeys(startId, count)
+
+        for preKey in preKeys:
+            self.storePreKey(preKey.getId(), preKey)
