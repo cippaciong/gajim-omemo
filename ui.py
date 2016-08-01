@@ -103,6 +103,8 @@ class Ui(object):
         self.chat_control = chat_control
         self.plugin = plugin
         self.state = state
+        self.account = self.contact.account.name
+        self.windowinstances = {}
 
         self.display_omemo_state()
         self.refreshAuthLockSymbol()
@@ -137,6 +139,29 @@ class Ui(object):
             return menu
         self.chat_control.prepare_context_menu = omemo_prepare_context_menu
 
+        # Hook into Send Button so we can check Stuff before sending
+        self.chat_control.orig_send_message = \
+            self.chat_control.send_message
+
+        def omemo_send_message(message, keyID='', chatstate=None, xhtml=None,
+                               process_commands=True, attention=False):
+
+            if self.encryption_active() and \
+                    self.plugin.are_keys_missing(self.account,
+                                                 self.contact.jid):
+
+                log.debug(self.account + ' => No Trusted Fingerprints for ' +
+                          self.contact.jid)
+                self.no_trusted_fingerprints_warning()
+            else:
+                self.chat_control.orig_send_message(message, keyID, chatstate,
+                                                    xhtml, process_commands,
+                                                    attention)
+                log.debug(self.account + ' => Sending Message to ' +
+                          self.contact.jid)
+
+        self.chat_control.send_message = omemo_send_message
+
     def set_omemo_state(self, enabled):
         """
         Enable or disable OMEMO for this window's contact and update the
@@ -145,7 +170,8 @@ class Ui(object):
         if enabled:
             log.debug(self.contact.account.name + ' => Enable OMEMO for ' +
                       self.contact.jid)
-            self.plugin.omemo_enable_for(self.contact)
+            self.plugin.omemo_enable_for(self.contact.jid,
+                                         self.contact.account.name)
             self.WarnIfUndecidedFingerprints()  # calls refreshAuthLockSymbol()
         else:
             log.debug(self.contact.account.name + ' => Disable OMEMO for ' +
@@ -163,10 +189,27 @@ class Ui(object):
         if not self.encryption_active():
             self.set_omemo_state(True)
 
-    def show_fingerprint_window(self):
-        dlg = FingerprintWindow(self.plugin, self.contact,
-                                self.chat_control.parent_win.window)
-        dlg.show_all()
+    def new_fingerprints_available(self):
+        fingerprints = self.state.store.getNewFingerprints(self.contact.jid)
+        if fingerprints:
+            self.show_fingerprint_window(fingerprints)
+
+    def show_fingerprint_window(self, fingerprints=None):
+        if 'dialog' not in self.windowinstances:
+            self.windowinstances['dialog'] = \
+                FingerprintWindow(self.plugin, self.contact,
+                                  self.chat_control.parent_win.window,
+                                  self.windowinstances)
+            self.windowinstances['dialog'].show_all()
+            if fingerprints:
+                log.debug(self.account +
+                          ' => Showing Fingerprint Prompt for ' +
+                          self.contact.jid)
+                self.state.store.setShownFingerprints(fingerprints)
+        else:
+            self.windowinstances['dialog'].update_context_list()
+            if fingerprints:
+                self.state.store.setShownFingerprints(fingerprints)
 
     def plain_warning(self):
         self.chat_control.print_conversation_line(
@@ -189,6 +232,11 @@ class Ui(object):
             self.chat_control.print_conversation_line(msg, 'status', '', None)
         self.refreshAuthLockSymbol()
 
+    def no_trusted_fingerprints_warning(self):
+        msg = "To send an encrypted message, you have to " \
+                          "first trust the fingerprint of your contact!"
+        self.chat_control.print_conversation_line(msg, 'status', '', None)
+
     def refreshAuthLockSymbol(self):
         if self.encryption_active():
             if self.state.store.identityKeyStore. \
@@ -206,6 +254,7 @@ class Ui(object):
         self.actions_hbox.remove(self.omemobutton)
         self.chat_control.prepare_context_menu = \
             self.chat_control.omemo_orig_prepare_context_menu
+        self.chat_control.send_message = self.chat_control.orig_send_message
 
 
 class OMEMOConfigDialog(GajimPluginConfigDialog):
@@ -391,14 +440,16 @@ class OMEMOConfigDialog(GajimPluginConfigDialog):
 
 
 class FingerprintWindow(gtk.Dialog):
-    def __init__(self, plugin, contact, parent):
+    def __init__(self, plugin, contact, parent, windowinstances):
         self.contact = contact
+        self.windowinstances = windowinstances
         gtk.Dialog.__init__(self,
                             title=('Fingerprints for %s') % contact.jid,
                             parent=parent,
                             flags=gtk.DIALOG_DESTROY_WITH_PARENT)
         close_button = self.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE)
         close_button.connect('clicked', self.on_close_button_clicked)
+        self.connect('delete-event', self.on_window_delete)
         self.plugin = plugin
         self.GTK_BUILDER_FILE_PATH = \
             self.plugin.local_file_path('fpr_dialog.ui')
@@ -438,6 +489,11 @@ class FingerprintWindow(gtk.Dialog):
         self.update_context_list()
 
     def on_close_button_clicked(self, widget):
+        del self.windowinstances['dialog']
+        self.hide()
+
+    def on_window_delete(self, widget, event):
+        del self.windowinstances['dialog']
         self.hide()
 
     def trust_button_clicked_cb(self, button, *args):

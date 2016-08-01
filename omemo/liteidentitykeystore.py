@@ -87,7 +87,19 @@ class LiteIdentityKeyStore(IdentityKeyStore):
         return result is not None
 
     def isTrustedIdentity(self, recipientId, identityKey):
-        return True
+        q = "SELECT trust FROM identities WHERE recipient_id = ? " \
+            "AND public_key = ?"
+        c = self.dbConn.cursor()
+
+        c.execute(q, (recipientId, identityKey.getPublicKey().serialize()))
+        result = c.fetchone()
+
+        states = [UNTRUSTED, TRUSTED, UNDECIDED]
+
+        if result and result[0] in states:
+            return result[0]
+        else:
+            return True
 
     def getAllFingerprints(self):
         q = "SELECT _id, recipient_id, public_key, trust FROM identities " \
@@ -112,13 +124,14 @@ class LiteIdentityKeyStore(IdentityKeyStore):
         return result
 
     def getTrustedFingerprints(self, jid):
-        q = "SELECT _id FROM identities WHERE recipient_id = ? AND trust = ?"
+        q = "SELECT public_key FROM identities WHERE recipient_id = ? AND trust = ?"
         c = self.dbConn.cursor()
 
         result = []
         c.execute(q, (jid, TRUSTED))
-        result = c.fetchall()
-
+        rows = c.fetchall()
+        for row in rows:
+            result.append(row[0])
         return result
 
     def getUndecidedFingerprints(self, jid):
@@ -131,23 +144,24 @@ class LiteIdentityKeyStore(IdentityKeyStore):
 
         return result
 
+    def getNewFingerprints(self, jid):
+        q = "SELECT _id FROM identities WHERE shown = 0 AND " \
+            "recipient_id = ?"
+        c = self.dbConn.cursor()
+        result = []
+        for row in c.execute(q, (jid,)):
+            result.append(row[0])
+        return result
+
+    def setShownFingerprints(self, fingerprints):
+        q = "UPDATE identities SET shown = 1 WHERE _id IN ({})" \
+            .format(', '.join(['?'] * len(fingerprints)))
+        c = self.dbConn.cursor()
+        c.execute(q, fingerprints)
+        self.dbConn.commit()
+
     def setTrust(self, _id, trust):
         q = "UPDATE identities SET trust = ? WHERE _id = ?"
         c = self.dbConn.cursor()
         c.execute(q, (trust, _id))
         self.dbConn.commit()
-
-    def getTrust(self, recipientId, identityKey):
-        q = "SELECT trust FROM identities WHERE recipient_id = ? " \
-            "AND public_key = ?"
-        c = self.dbConn.cursor()
-
-        c.execute(q, (recipientId, identityKey.getPublicKey().serialize()))
-        result = c.fetchone()
-
-        states = [UNTRUSTED, TRUSTED, UNDECIDED]
-
-        if result and result[0] in states:
-            return result[0]
-        else:
-            return UNDECIDED
