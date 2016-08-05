@@ -253,12 +253,15 @@ class OmemoState:
         my_other_devices = set(self.own_devices) - set({self.own_device_id})
         # Encrypt the message key with for each of our own devices
         for dev in my_other_devices:
-            cipher = self.get_session_cipher(from_jid, dev)
-            if self.isTrusted(cipher) == TRUSTED:
-                encrypted_keys[dev] = cipher.encrypt(key).serialize()
-            else:
-                log.debug('Skipped own Device because Trust is: ' +
-                          str(self.isTrusted(cipher)))
+            try:
+                cipher = self.get_session_cipher(from_jid, dev)
+                if self.isTrusted(cipher) == TRUSTED:
+                    encrypted_keys[dev] = cipher.encrypt(key).serialize()
+                else:
+                    log.debug('Skipped own Device because Trust is: ' +
+                              str(self.isTrusted(cipher)))
+            except:
+                log.warn('Failed to find key for device ' + str(dev))
 
         payload = encrypt(key, iv, plaintext)
 
@@ -281,19 +284,18 @@ class OmemoState:
             isTrustedIdentity(self.cipher.recipientId, self.key)
 
     def getTrustedFingerprints(self, recipient_id):
-        log.debug('Inactive fingerprints')
-        log.debug(self.store.getInactiveSessionsKeys(recipient_id))
-        log.debug('trusted fingerprints')
-        log.debug(self.store.getTrustedFingerprints(recipient_id))
-
         inactive = self.store.getInactiveSessionsKeys(recipient_id)
         trusted = self.store.getTrustedFingerprints(recipient_id)
         trusted = set(trusted) - set(inactive)
 
-        log.debug('trusted active fingerprints')
-        log.debug(trusted)
-
         return trusted
+
+    def getUndecidedFingerprints(self, recipient_id):
+        inactive = self.store.getInactiveSessionsKeys(recipient_id)
+        undecided = self.store.getUndecidedFingerprints(recipient_id)
+        undecided = set(undecided) - set(inactive)
+
+        return undecided
 
     def device_list_for(self, jid):
         """ Return a list of known device ids for the specified jid.

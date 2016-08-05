@@ -24,6 +24,10 @@ import sqlite3
 import ui
 import re
 
+from common import demandimport
+demandimport.enable()
+demandimport.ignore += ['_imp']
+
 # pylint: disable=import-error
 from common import caps_cache, gajim, ged
 from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
@@ -394,6 +398,24 @@ class OmemoPlugin(GajimPlugin):
     def are_keys_missing(self, account, contact_jid):
         """ Check DB if keys are missing and query them """
         state = self.get_omemo_state(account)
+        my_jid = gajim.get_jid_from_account(account)
+
+        # Fetch Bundles of own other Devices
+        if my_jid not in self.query_for_bundles:
+
+            devices_without_session = state \
+                    .devices_without_sessions(my_jid)
+
+            self.query_for_bundles.append(my_jid)
+
+            if devices_without_session:
+                for device_id in devices_without_session:
+                    self.fetch_device_bundle_information(account,
+                                                         state,
+                                                         my_jid,
+                                                         device_id)
+
+        # Fetch Bundles of contacts devices
         if contact_jid not in self.query_for_bundles:
 
             devices_without_session = state \
@@ -498,8 +520,6 @@ class OmemoPlugin(GajimPlugin):
             # Warn User about new Fingerprints in DB if Chat Window is Open
             if account_name in self.ui_list and \
                     recipient_id in self.ui_list[account_name]:
-                self.ui_list[account_name][recipient_id]. \
-                    WarnIfUndecidedFingerprints()
                 self.ui_list[account_name][recipient_id]. \
                     new_fingerprints_available()
 
