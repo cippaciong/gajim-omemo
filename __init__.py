@@ -22,7 +22,6 @@ import logging
 import os
 import sqlite3
 import ui
-import re
 
 from common import demandimport
 demandimport.enable()
@@ -33,6 +32,7 @@ from common import caps_cache, gajim, ged
 from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
 from plugins import GajimPlugin
 from plugins.helpers import log_calls
+
 
 from nbxmpp.simplexml import Node
 from nbxmpp import NS_CORRECT
@@ -47,19 +47,40 @@ from .xmpp import (
 
 iq_ids_to_callbacks = {}
 
-AXOLOTL_MISSING = 'Please install python-axolotl.'
+AXOLOTL_MISSING = 'You are missing Python-Axolotl or use an outdated version'
+PROTOBUF_MISSING = 'OMEMO cant import Google Protobuf, you can find help in ' \
+                   'the GitHub Wiki'
+GAJIM_VERSION = 'OMEMO only works with the latest Gajim version, get the ' \
+                'latest version from gajim.org'
+ERROR_MSG = ''
 
 NS_HINTS = 'urn:xmpp:hints'
+DB_DIR = gajim.gajimpaths.data_root
 
 log = logging.getLogger('gajim.plugin_system.omemo')
-try:
-    from omemo.state import OmemoState
-    HAS_AXOLOTL = True
-except ImportError as e:
-    log.error(e)
-    HAS_AXOLOTL = False
 
-DB_DIR = gajim.gajimpaths.data_root
+try:
+    from .omemo.state import OmemoState
+except Exception as e:
+    log.error(e)
+    ERROR_MSG = 'Error: ' + e
+
+try:
+    import google.protobuf
+except Exception as e:
+    log.error(e)
+    ERROR_MSG = PROTOBUF_MISSING
+
+try:
+    import axolotl
+    if axolotl.__version__ < "0.1.35":
+        ERROR_MSG = AXOLOTL_MISSING
+except Exception as e:
+    log.error(e)
+    ERROR_MSG = AXOLOTL_MISSING
+
+if gajim.config.get('version') < "0.16.5":
+    ERROR_MSG = GAJIM_VERSION
 
 
 class OmemoPlugin(GajimPlugin):
@@ -71,9 +92,9 @@ class OmemoPlugin(GajimPlugin):
     @log_calls('OmemoPlugin')
     def init(self):
         # pylint: disable=attribute-defined-outside-init
-        if not HAS_AXOLOTL:
+        if ERROR_MSG:
             self.activatable = False
-            self.available_text = _(AXOLOTL_MISSING)
+            self.available_text = ERROR_MSG
             return
         self.events_handlers = {
             'mam-message-received': (ged.PRECORE, self.mam_message_received),
@@ -641,10 +662,9 @@ class OmemoPlugin(GajimPlugin):
 
     def print_msg_to_log(self, stanza):
         log.debug('-'*15)
-        stanzastr = str(stanza)
-        for item in re.split("(<.*?>)(<.*?/.*?>)", stanzastr):
-            if item:
-                log.debug(item)
+        stanzastr = '\n' + stanza.__str__(fancy=True)
+        stanzastr = stanzastr[0:-1]
+        log.debug(stanzastr)
         log.debug('-'*15)
 
     @log_calls('OmemoPlugin')
@@ -672,7 +692,21 @@ class OmemoPlugin(GajimPlugin):
                 return True
 
             encrypted_node = OmemoMessage(msg_dict)
-            event.msg_iq.delChild('body')
+            contacts = gajim.contacts.get_contacts(account, to_jid)
+            non_omemo_resource_online = False
+            for contact in contacts:
+                if contact.show == 'offline':
+                    continue
+                if not contact.supports(NS_NOTIFY):
+                    log.debug(contact.get_full_jid() +
+                              ' => Contact doesnt support OMEMO, '
+                              'adding Info Message to Body')
+                    support_msg = 'You received a message encrypted with ' \
+                                  'OMEMO but your client doesnt support OMEMO.'
+                    event.msg_iq.setBody(support_msg)
+                    non_omemo_resource_online = True
+            if not non_omemo_resource_online:
+                event.msg_iq.delChild('body')
             event.msg_iq.addChild(node=encrypted_node)
             store = Node('store', attrs={'xmlns': NS_HINTS})
             event.msg_iq.addChild(node=store)
