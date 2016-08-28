@@ -21,6 +21,7 @@
 import logging
 import os
 import sqlite3
+import os
 
 from common import caps_cache, gajim, ged
 from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
@@ -52,6 +53,7 @@ GAJIM_VERSION = 'OMEMO only works with the latest Gajim version, get the ' \
 ERROR_MSG = ''
 
 NS_HINTS = 'urn:xmpp:hints'
+NS_PGP = 'urn:xmpp:openpgp:0'
 DB_DIR = gajim.gajimpaths.data_root
 
 log = logging.getLogger('gajim.plugin_system.omemo')
@@ -74,9 +76,20 @@ except Exception as e:
     log.error(e)
     ERROR_MSG = AXOLOTL_MISSING
 
-ver = gajim.config.get('version')
-if ver[0:6] != '0.16.5':
-    ERROR_MSG = GAJIM_VERSION
+GAJIM_VER = gajim.config.get('version')
+
+if os.name != 'nt':
+    try:
+        SETUPTOOLS_MISSING = False
+        from pkg_resources import parse_version
+    except Exception as e:
+        log.error(e)
+        SETUPTOOLS_MISSING = True
+        ERROR_MSG = 'You are missing the Setuptools package.'
+
+    if not SETUPTOOLS_MISSING:
+        if parse_version(GAJIM_VER) < parse_version('0.16.5'):
+            ERROR_MSG = GAJIM_VERSION
 
 # pylint: disable=no-init
 # pylint: disable=attribute-defined-outside-init
@@ -222,6 +235,9 @@ class OmemoPlugin(GajimPlugin):
             -------
             Return means that the Event is passed on to Gajim
         """
+        if msg.msg_.getTag('openpgp', namespace=NS_PGP):
+            return
+
         omemo_encrypted_tag = msg.msg_.getTag('encrypted', namespace=NS_OMEMO)
         if omemo_encrypted_tag:
             account = msg.conn.name
@@ -262,14 +278,6 @@ class OmemoPlugin(GajimPlugin):
             if omemo_enabled:
                 msg.msgtxt = '**Unencrypted** ' + msg.msgtxt
 
-                try:
-                    gui = self.ui_list[account].get(jid, None)
-                    if gui and gui.encryption_active():
-                        gui.plain_warning()
-                except KeyError:
-                    log.debug('No Ui present for ' + jid +
-                              ', Ui Warning not shown')
-
     @log_calls('OmemoPlugin')
     def message_received(self, msg):
         """ Handles an incoming message
@@ -285,6 +293,9 @@ class OmemoPlugin(GajimPlugin):
             -------
             Return means that the Event is passed on to Gajim
         """
+        if msg.stanza.getTag('openpgp', namespace=NS_PGP):
+            return
+
         if msg.stanza.getTag('encrypted', namespace=NS_OMEMO) and \
                 msg.mtype == 'chat':
             account = msg.conn.name
