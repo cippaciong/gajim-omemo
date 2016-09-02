@@ -21,7 +21,6 @@
 import logging
 import os
 import sqlite3
-import os
 
 from common import caps_cache, gajim, ged
 from common.pep import SUPPORTED_PERSONAL_USER_EVENTS
@@ -40,7 +39,7 @@ from .xmpp import (
 
 from common import demandimport
 demandimport.enable()
-demandimport.ignore += ['_imp']
+demandimport.ignore += ['_imp', '_thread']
 
 
 IQ_CALLBACK = {}
